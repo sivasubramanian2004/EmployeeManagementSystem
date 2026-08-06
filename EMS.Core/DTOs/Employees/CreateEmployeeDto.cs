@@ -44,7 +44,7 @@ namespace EMS.Core.DTOs.Employees
             [StringLength(5)]
             public string? BloodGroup { get; set; }
 
-            [Range(1, int.MaxValue, ErrorMessage = "Valid DepartmentId is required.")]
+            [Range(1, int.MaxValue, ErrorMessage = "DepartmentId is required.")]
             public int DepartmentId { get; set; }
 
             [Range(1, int.MaxValue, ErrorMessage = "Valid DesignationId is required.")]
