@@ -1,0 +1,43 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+namespace EMS.Core.Helpers
+{ 
+    public interface IUrlHelperService
+    {
+        string GetBaseUrl();
+        string BuildFullUrl(string relativePath);
+    }
+
+    public class UrlHelperService : IUrlHelperService
+    {
+        private readonly IHttpContextAccessor _httpContextAccessor;
+
+        public UrlHelperService(IHttpContextAccessor httpContextAccessor)
+        {
+            _httpContextAccessor = httpContextAccessor;
+        }
+
+        public string GetBaseUrl()
+        {
+            var request = _httpContextAccessor.HttpContext?.Request
+                ?? throw new InvalidOperationException("HttpContext is not available.");
+
+            return $"{request.Scheme}://{request.Host}";   // e.g., "https://localhost:7196"
+        }
+
+        public string BuildFullUrl(string relativePath)
+        {
+            if (string.IsNullOrWhiteSpace(relativePath))
+                return string.Empty;
+
+            var baseUrl = GetBaseUrl();
+
+            // Ensure exactly one slash between base and relative path
+            return $"{baseUrl}/{relativePath.TrimStart('/')}";
+        }
+    }
+}
