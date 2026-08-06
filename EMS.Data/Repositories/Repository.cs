@@ -43,7 +43,7 @@ public class Repository<T>(EmsDbContext context) : IRepository<T> where T : clas
         }
 
         /// <summary>
-        /// Gets an entity by its identifier asynchronously.
+       // /// Gets an entity by its identifier asynchronously.
         /// </summary>
         /// <param name="id">The identifier.</param>
         /// <returns>The entity.</returns>
