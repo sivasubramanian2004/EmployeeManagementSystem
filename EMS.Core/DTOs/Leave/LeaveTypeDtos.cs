@@ -15,7 +15,7 @@ namespace EMS.Core.DTOs.Leave
     public class LeaveTypeResponseDto
     {
         public int Id { get; set; }
-        public string LeaveTypeName { get; set; } = string.Empty;
+        public string LeaveTypeName { get; set; } = string.Empty
         public int DefaultDaysPerYear { get; set; }
     }
 }
