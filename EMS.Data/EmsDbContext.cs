@@ -17,6 +17,10 @@ public partial class EmsDbContext : DbContext
     {
     }
 
+    public virtual DbSet<Career> Careers { get; set; }
+
+    public virtual DbSet<Careereducation> Careereducations { get; set; }
+
     public virtual DbSet<Department> Departments { get; set; }
 
     public virtual DbSet<Designation> Designations { get; set; }
@@ -26,6 +30,8 @@ public partial class EmsDbContext : DbContext
     public virtual DbSet<Employeedocument> Employeedocuments { get; set; }
 
     public virtual DbSet<Employeepersonaldetail> Employeepersonaldetails { get; set; }
+
+    public virtual DbSet<Jobposting> Jobpostings { get; set; }
 
     public virtual DbSet<Leaverequest> Leaverequests { get; set; }
 
@@ -37,11 +43,79 @@ public partial class EmsDbContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
+        => optionsBuilder.UseMySql("server=localhost;port=3306;database=EmployeeManagementSystemDB;user=root;password=sivas200424mcr104", Microsoft.EntityFrameworkCore.ServerVersion.Parse("8.0.41-mysql"));
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
             .UseCollation("utf8mb4_0900_ai_ci")
             .HasCharSet("utf8mb4");
+
+        modelBuilder.Entity<Career>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("careers");
+
+            entity.HasIndex(e => e.JobPostingId, "FK_Careers_JobPosting");
+
+            entity.Property(e => e.City).HasMaxLength(100);
+            entity.Property(e => e.Country).HasMaxLength(100);
+            entity.Property(e => e.CreatedDate)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.CurrentCompany).HasMaxLength(150);
+            entity.Property(e => e.CurrentDesignation).HasMaxLength(150);
+            entity.Property(e => e.CurrentSalary).HasMaxLength(50);
+            entity.Property(e => e.DeletedDate).HasColumnType("datetime");
+            entity.Property(e => e.Email).HasMaxLength(150);
+            entity.Property(e => e.ExpectedSalary).HasPrecision(18, 2);
+            entity.Property(e => e.Experience).HasPrecision(5, 2);
+            entity.Property(e => e.FirstName).HasMaxLength(100);
+            entity.Property(e => e.GitHubUrl).HasMaxLength(500);
+            entity.Property(e => e.JobApplicationPosition).HasMaxLength(150);
+            entity.Property(e => e.LastName).HasMaxLength(100);
+            entity.Property(e => e.LinkedInUrl).HasMaxLength(500);
+            entity.Property(e => e.Mobile).HasMaxLength(20);
+            entity.Property(e => e.ModifiedDate).HasColumnType("datetime");
+            entity.Property(e => e.NoticePeriod).HasMaxLength(50);
+            entity.Property(e => e.PhotoPath).HasMaxLength(500);
+            entity.Property(e => e.Pincode).HasMaxLength(20);
+            entity.Property(e => e.ReferralEmail).HasMaxLength(100);
+            entity.Property(e => e.ResumePath).HasMaxLength(500);
+            entity.Property(e => e.SkillSet).HasColumnType("text");
+            entity.Property(e => e.State).HasMaxLength(100);
+            entity.Property(e => e.Street).HasMaxLength(250);
+
+            entity.HasOne(d => d.JobPosting).WithMany(p => p.Careers)
+                .HasForeignKey(d => d.JobPostingId)
+                .HasConstraintName("FK_Careers_JobPosting");
+        });
+
+        modelBuilder.Entity<Careereducation>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("careereducations");
+
+            entity.HasIndex(e => e.CareerId, "FK_CareerEducations_Careers");
+
+            entity.Property(e => e.CreatedDate)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.Degree).HasMaxLength(150);
+            entity.Property(e => e.DeletedDate).HasColumnType("datetime");
+            entity.Property(e => e.EducationType).HasMaxLength(100);
+            entity.Property(e => e.InstitutionName).HasMaxLength(200);
+            entity.Property(e => e.ModifiedDate).HasColumnType("datetime");
+            entity.Property(e => e.Percentage).HasPrecision(5, 2);
+
+            entity.HasOne(d => d.Career).WithMany(p => p.Careereducations)
+                .HasForeignKey(d => d.CareerId)
+                .HasConstraintName("FK_CareerEducations_Careers");
+        });
 
         modelBuilder.Entity<Department>(entity =>
         {
@@ -202,6 +276,39 @@ public partial class EmsDbContext : DbContext
                 .HasForeignKey<Employeepersonaldetail>(d => d.EmployeeId)
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_EmployeePersonalDetails_Employee");
+        });
+
+        modelBuilder.Entity<Jobposting>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("jobpostings");
+
+            entity.HasIndex(e => e.DepartmentId, "FK_JobPostings_Department");
+
+            entity.Property(e => e.CreatedDate)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP")
+                .HasColumnType("datetime");
+            entity.Property(e => e.DeletedDate).HasColumnType("datetime");
+            entity.Property(e => e.Description).HasColumnType("text");
+            entity.Property(e => e.EmploymentType).HasMaxLength(20);
+            entity.Property(e => e.Location).HasMaxLength(150);
+            entity.Property(e => e.MaxExperience).HasPrecision(4, 1);
+            entity.Property(e => e.MaxSalary).HasPrecision(12, 2);
+            entity.Property(e => e.MinExperience).HasPrecision(4, 1);
+            entity.Property(e => e.MinSalary).HasPrecision(12, 2);
+            entity.Property(e => e.ModifiedDate).HasColumnType("datetime");
+            entity.Property(e => e.NumberOfOpenings).HasDefaultValueSql("'1'");
+            entity.Property(e => e.Requirements).HasColumnType("text");
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'Open'");
+            entity.Property(e => e.Title).HasMaxLength(150);
+            entity.Property(e => e.WorkMode).HasMaxLength(20);
+
+            entity.HasOne(d => d.Department).WithMany(p => p.Jobpostings)
+                .HasForeignKey(d => d.DepartmentId)
+                .HasConstraintName("FK_JobPostings_Department");
         });
 
         modelBuilder.Entity<Leaverequest>(entity =>

@@ -9,7 +9,7 @@ namespace EMS.Core.Helpers
     public interface IUrlHelperService
     {
         string GetBaseUrl();
-        string BuildFullUrl(string relativePath);
+        string BuildFullUrl(string? relativePath);
     }
 
     public class UrlHelperService : IUrlHelperService
@@ -26,17 +26,17 @@ namespace EMS.Core.Helpers
             var request = _httpContextAccessor.HttpContext?.Request
                 ?? throw new InvalidOperationException("HttpContext is not available.");
 
-            return $"{request.Scheme}://{request.Host}";   // e.g., "https://localhost:7196"
+            return $"{request.Scheme}://{request.Host}";
         }
 
-        public string BuildFullUrl(string relativePath)
+        public string? BuildFullUrl(string? relativePath)
         {
             if (string.IsNullOrWhiteSpace(relativePath))
-                return string.Empty;
+                return null;
 
             var baseUrl = GetBaseUrl();
 
-            // Ensure exactly one slash between base and relative path
+            // Ensure exactly one slash between base URL and relative path
             return $"{baseUrl}/{relativePath.TrimStart('/')}";
         }
     }

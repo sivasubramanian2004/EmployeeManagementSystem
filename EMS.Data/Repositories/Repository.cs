@@ -288,7 +288,7 @@ public class Repository<T>(EmsDbContext context) : IRepository<T> where T : clas
 
         await Entities.AddAsync(entity);
     }
-
+ 
     public virtual async Task AddRangeAsync(IEnumerable<T> entities)
     {
         if (entities == null)

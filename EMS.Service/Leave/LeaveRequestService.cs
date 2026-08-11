@@ -102,7 +102,7 @@
         return await MapToResponseDto(leaveRequest.Id);
     }
 
-    // ---------- GET MY LEAVES (employee's own requests) ----------
+/*    // ---------- GET MY LEAVES (employee's own requests) ----------
     public async Task<List<LeaveRequestResponseDto>> GetMyLeavesAsync(int employeeId)
     {
         return await _leaveRequestRepo.TableNoTracking
@@ -132,7 +132,7 @@
             })
             .ToListAsync();
     }
-
+*/
     // ---------- GET PENDING APPROVALS (for a manager) ----------
     public async Task<List<LeaveRequestResponseDto>> GetPendingApprovalsAsync(int managerEmployeeId)
     {

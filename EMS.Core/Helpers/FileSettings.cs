@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace EMS.Core.DTOs.Documents
+namespace EMS.Core.Helpers
 {
-    public class FileStorageSettings
+    public class FileSettings
     {
         public string BasePath { get; set; } = string.Empty;
         public int MaxFileSizeInMB { get; set; }
