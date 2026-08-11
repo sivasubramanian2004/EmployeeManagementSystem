@@ -7,8 +7,6 @@ using EMS.Core.DTOs.Documents;
 namespace EMS.Service.Documents
 {
     public interface IEmployeeDocumentService
-    {
-        Task<DocumentResponseDto> UploadDocumentAsync(UploadDocumentDto dto, int uploadedBy);
-      
+    {      
     }
 }

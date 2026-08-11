@@ -19,13 +19,13 @@ public partial class Employee
 
     public DateOnly Dob { get; set; }
 
-    public string? Email { get; set; }
+    public string Email { get; set; } = null!;
 
     public string? Phone { get; set; }
 
     public string? Address { get; set; }
 
-    public DateTime DateOfJoining { get; set; }
+    public DateOnly DateOfJoining { get; set; }
 
     public string? BloodGroup { get; set; }
 
@@ -36,8 +36,6 @@ public partial class Employee
     public int DesignationId { get; set; }
 
     public int RoleId { get; set; }
-
-    public int? ManagerId { get; set; }
 
     public bool? IsActive { get; set; }
 
@@ -54,6 +52,8 @@ public partial class Employee
     public int? DeletedBy { get; set; }
 
     public DateTime? DeletedDate { get; set; }
+
+    public int? ManagerId { get; set; }
 
     public virtual Department Department { get; set; } = null!;
 

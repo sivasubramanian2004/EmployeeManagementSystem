@@ -1,16 +1,18 @@
-﻿using System;
+﻿
+using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
-using Microsoft.EntityFrameworkCore;
 namespace EMS.Core.Helpers
 {
     public static class IQueryableExtensions
     {
         public static async Task<PagedResult<T>> ToPagedResultAsync<T>(
             this IQueryable<T> query,
-            PaginationRequest request,
+            QueryParameterFilter request,
             CancellationToken cancellationToken = default)
         {
             var totalRecords = await query.CountAsync(cancellationToken);
@@ -28,5 +30,25 @@ namespace EMS.Core.Helpers
                 TotalRecords = totalRecords
             };
         }
+
+        public static IQueryable<T> ApplySorting<T>(
+          this IQueryable<T> query,
+          QueryParameterFilter request,
+          Dictionary<string, Expression<Func<T, object>>> sortOptions, Expression<Func<T, object>> defaultSort)
+        {
+            if (string.IsNullOrWhiteSpace(request.SortBy))
+                return query;
+
+            var sortBy = request.SortBy.Trim().ToLowerInvariant();
+
+            if (sortOptions.TryGetValue(sortBy, out var sortExpression))
+            {
+                return query.OrderBy(sortExpression);
+            }
+
+            return query.OrderBy(defaultSort);
+        }
     }
-}
+    
+    
+}      

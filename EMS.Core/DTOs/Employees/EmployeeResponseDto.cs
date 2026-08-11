@@ -15,7 +15,7 @@ namespace EMS.Core.DTOs.Employees
         public string DepartmentName { get; set; } = string.Empty;
         public string DesignationName { get; set; } = string.Empty;
         public string RoleName { get; set; } = string.Empty;
-        public DateTime DateOfJoining { get; set; }
+        public DateOnly DateOfJoining { get; set; }
 
        // public bool HasPersonalDetails { get; set; }
     }

@@ -1,0 +1,31 @@
+name: .NET 8 CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore Packages
+        run: dotnet restore EmployeeManagementSystem.sln
+
+      - name: Build Solution
+        run: dotnet build EmployeeManagementSystem.sln --configuration Release --no-restore

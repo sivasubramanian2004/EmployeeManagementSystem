@@ -45,7 +45,7 @@ public class LeaveRequestController : BaseController
         });
     }
 
-    [HttpGet("my-leaves")]
+  /*  [HttpGet("my-leaves")]
     [Authorize]
     public async Task<IActionResult> GetMyLeaves()
     {
@@ -60,7 +60,7 @@ public class LeaveRequestController : BaseController
             StatusCode = 200
         });
     }
-
+*/
     [HttpGet("pending-approvals")]
     [Authorize(Roles = "Manager")]
     public async Task<IActionResult> GetPendingApprovals()

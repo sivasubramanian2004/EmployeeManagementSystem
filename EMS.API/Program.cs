@@ -6,11 +6,13 @@ using EMS.Data.Models;
 using EMS.Data.Repositories;
 using EMS.Data.UnitOfWork;
 using EMS.Service.Authentication;
+using EMS.Service.Careers;
 using EMS.Service.Departments;
 using EMS.Service.Designations;
 using EMS.Service.Documents;
 using EMS.Service.Email;
 using EMS.Service.Employees;
+using EMS.Service.FileStorage;
 using EMS.Service.Leave;
 using EMS.Service.Roles;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -78,7 +80,6 @@ builder.Services.AddAuthorization();
 // ============================
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<IUnitOfWork, EMS.Data.UnitOfWork.UnitOfWork>();
-builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IEmailService,EmailService>();
 builder.Services.AddSingleton<JwtTokenGenerator>();
@@ -86,15 +87,15 @@ builder.Services.AddScoped<IDesignationService, DesignationService>();
 builder.Services.AddScoped<IDepartmentService, DepartmentService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
 builder.Services.AddScoped<IEmployeeService, EmployeeService>();
-
+builder.Services.AddScoped<IFileStorageService, FileStorageService>();
 builder.Services.AddScoped<ILeaveRequestService, LeaveRequestService>();
+//careers
+builder.Services.AddScoped<ICareerService, CareerService>();
 
-
-
-builder.Services.Configure<FileStorageSettings>(builder.Configuration.GetSection("FileStorageSettings"));
-builder.Services.AddScoped<IEmployeeDocumentService, EmployeeDocumentService>();
-
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
+builder.Services.Configure<FileSettings>(builder.Configuration.GetSection("FileSettings"));
 builder.Services.AddScoped<IUrlHelperService, UrlHelperService>();
+
 builder.Services.AddHttpContextAccessor();   // add this, if not already there
 // already covered via open-generic registration
 

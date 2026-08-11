@@ -39,7 +39,7 @@ namespace EMS.Core.DTOs.Employees
             public string? Address { get; set; }
 
             [Required(ErrorMessage = "Date of joining is required.")]
-            public DateTime DateOfJoining { get; set; }
+            public DateOnly DateOfJoining { get; set; }
 
             [StringLength(5)]
             public string? BloodGroup { get; set; }
