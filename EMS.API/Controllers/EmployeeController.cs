@@ -1,5 +1,7 @@
-﻿using EMS.Core.DTOs.Employees;
+﻿using EMS.Core.DTOs.Documents;
+using EMS.Core.DTOs.Employees;
 using EMS.Core.Helpers;
+using EMS.Data.Models;
 using EMS.Service.Employees;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -35,6 +37,28 @@ namespace EMS.API.Controllers
 
             return StatusCode(201, response);
         }
+
+        [HttpPost("upload")]
+        [Authorize]
+        [RequestSizeLimit(10 * 1024 * 1024)]   // 10 MB hard cap at the request level (extra safety, beyond service-level check)
+        public async Task<IActionResult> Upload([FromForm] UploadDocumentDto dto)
+        {
+            var uploadedBy = GetCurrentUserId();
+            var result = await _Employeeservice.UploadDocumentAsync(dto, uploadedBy);
+
+            var response = new ApiResponse<DocumentResponseDto>
+            {
+                Success = true,
+                Message = "Document uploaded successfully.",
+                Data = result,
+                StatusCode = 201
+            };
+
+            return StatusCode(201, response);
+        }
+
+
+
         [HttpGet("Get-Employee/{id:int}")]
         [Authorize(Roles = "Admin,HR,Employee,Manager")]
         public async Task<IActionResult> GetById(int id)
@@ -53,7 +77,7 @@ namespace EMS.API.Controllers
         }
         [HttpGet("GetAll-Employee")]
         [Authorize(Roles = "Admin,HR,Employee")]
-        public async Task<IActionResult> GetAll([FromQuery] PaginationRequest request)
+        public async Task<IActionResult> GetAll([FromQuery] EmployeeFilterRequest request)
         {
             var result = await _Employeeservice.GetAllEmployeesAsync(request);
 
@@ -66,6 +90,24 @@ namespace EMS.API.Controllers
             };
             return Ok(response);
 
+        }
+        [HttpDelete("Delete-Employee/{id:int}")]
+        [Authorize(Roles = "HR,Employee,Admin")]
+        public async Task<IActionResult> Delete(int id) {
+
+            int deletedBy = GetCurrentUserId();
+            await _Employeeservice.DeleteAsync(id, deletedBy);
+
+            var response = new ApiResponse<Object>
+            {
+                Success = true,
+                Message = "Employee details Deleted successfully.",
+                Data = null,
+                StatusCode = 200
+            };
+            return Ok(response);
+            
+        
         }
 
     }

@@ -57,20 +57,20 @@ namespace EMS.API.Controllers
             var createdBy = GetCurrentUserId();
             var leaveType = new Leavetype
             {
-                LeaveTypeName = dto.LeaveTypeName,
+                LeaveTypeName = dto.LeaveTypeName.ToUpper().Trim(),
                 DefaultDaysPerYear = dto.DefaultDaysPerYear,
                 CreatedDate = DateTime.UtcNow,
                 CreatedBy = createdBy
             };
 
-            await _repo.AddAsync(leaveType);
-            await _unitOfWork.SaveChangesAsync();
+            await _repo.InsertAsync(leaveType);
+           // await _unitOfWork.SaveChangesAsync();
 
             return StatusCode(201, new ApiResponse<object>
             {
                 Success = true,
                 Message = "Leave type created successfully.",
-                Data = new { id = leaveType.Id },
+                Data = new { id = leaveType.Id, LeaveType=leaveType.LeaveTypeName },
                 StatusCode = 201
             });
         }

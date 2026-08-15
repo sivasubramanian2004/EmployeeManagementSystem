@@ -1,18 +1,22 @@
 ﻿using EMS.Core.DTOs.Designation;
 using EMS.Core.DTOs.Documents;
 using EMS.Core.DTOs.Employees;
+using EMS.Core.Enums;
 using EMS.Core.Helpers;
 using EMS.Data;
 using EMS.Data.Models;
 using EMS.Data.Repositories;
 using EMS.Data.UnitOfWork;
+using EMS.Service.FileStorage;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Org.BouncyCastle.Asn1.Ocsp;
 using System;
+using System.Linq.Expressions;
 namespace EMS.Service.Employees;
-
-
 public class EmployeeService : IEmployeeService
 
 {
@@ -21,26 +25,32 @@ public class EmployeeService : IEmployeeService
     private readonly IRepository<User> _userRepo;
     private readonly IRepository<Employee> _employeeRepo;
     private readonly IRepository<Employeepersonaldetail> _personalDetailRepo;
+    private readonly IRepository<Employeedocument> _documentRepo;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IUrlHelperService _urlHelper;
     private readonly ILogger<EmployeeService> _logger;
+    private readonly IFileStorageService _fileStorageService;
 
     public EmployeeService(
         EmsDbContext context,
         IRepository<User> userRepo,
         IRepository<Employee> employeeRepo,
         IRepository<Employeepersonaldetail> personalDetailRepo,
+        IRepository<Employeedocument> documentRepo,
         IUnitOfWork unitOfWork,
         IUrlHelperService urlHelper,
-        ILogger<EmployeeService> logger)
+        ILogger<EmployeeService> logger,
+        IFileStorageService fileStorageService)
     {
         _context = context;
         _userRepo = userRepo;
         _employeeRepo = employeeRepo;
         _personalDetailRepo = personalDetailRepo;
+        _documentRepo = documentRepo;
         _unitOfWork = unitOfWork;
         _urlHelper = urlHelper;
-        _logger = logger;
+        _fileStorageService= fileStorageService;
+       _logger = logger;
     }
 
     public async Task<EmployeeResponseDto> CreateEmployeeAsync(CreateEmployeeDto dto, int createdBy)
@@ -85,9 +95,26 @@ public class EmployeeService : IEmployeeService
             .FirstOrDefaultAsync(r => r.Id == dto.RoleId && r.IsDeleted != true)
             ?? throw new KeyNotFoundException($"Role with Id {dto.RoleId} not found.");
 
-        // ---------- Transaction: Employee + PersonalDetails together ----------
+        if (dto.PersonalDetails.MaritalStatus.HasValue &&
+               !Enum.IsDefined(dto.PersonalDetails.MaritalStatus.Value))
+        {
+            throw new ArgumentException(
+                $"Invalid marital status: {dto.PersonalDetails.MaritalStatus.Value}.");
+        }
+        if (dto.BloodGroup.HasValue && !Enum.IsDefined(typeof(BloodGroup), dto.BloodGroup))
+        {
+            throw new ArgumentException(
+                $"Invalid blood group: {dto.BloodGroup}.");
+        }
 
-        await _unitOfWork.BeginTransactionAsync();
+        if (!Enum.IsDefined(typeof(Gender), dto.Gender))
+        {
+            throw new ArgumentException(
+                $"Invalid gender: {dto.Gender}.");
+        }
+            // ---------- Transaction: Employee + PersonalDetails together ----------
+
+            await _unitOfWork.BeginTransactionAsync();
         try
         {
             var employee = new Employee
@@ -96,13 +123,13 @@ public class EmployeeService : IEmployeeService
                 EmpNo = dto.EmpNo,
                 Name = dto.Name,
                 Age = dto.Age,
-                Gender = dto.Gender,
+                Gender = dto.Gender.ToString(),
                 Dob = dto.DOB,
                 Email = dto.Email,
                 Phone = dto.Phone,
                 Address = dto.Address,
                 DateOfJoining = dto.DateOfJoining,
-                BloodGroup = dto.BloodGroup,
+                BloodGroup = dto.BloodGroup.ToString(),
                 DepartmentId = dto.DepartmentId,
                 DesignationId = dto.DesignationId,
                 RoleId = dto.RoleId,
@@ -114,7 +141,6 @@ public class EmployeeService : IEmployeeService
 
             await _employeeRepo.AddAsync(employee);
 
-            bool hasPersonalDetails = false;
 
             if (dto.PersonalDetails != null)
             {
@@ -123,7 +149,7 @@ public class EmployeeService : IEmployeeService
                 var personalDetail = new Employeepersonaldetail
                 {
                     Employee = employee,
-                    MaritalStatus = pd.MaritalStatus,
+                    MaritalStatus = pd.MaritalStatus.ToString(),
                     Nationality = pd.Nationality,
                     AadharNumber = pd.AadharNumber,
                     PanNumber = pd.PanNumber,
@@ -158,7 +184,6 @@ public class EmployeeService : IEmployeeService
                 };
 
                 await _personalDetailRepo.AddAsync(personalDetail);
-                hasPersonalDetails = true;
             }
 
             await _unitOfWork.SaveChangesAsync();          // ✅ ONE round trip
@@ -187,20 +212,117 @@ public class EmployeeService : IEmployeeService
             _logger.LogError(ex,
                 "Failed to create employee profile for Email: {Email}, EmpNo: {EmpNo}",
                 dto.Email, dto.EmpNo);
+            throw;  
+        }
+    }
+    public async Task<DocumentResponseDto> UploadDocumentAsync(UploadDocumentDto dto, int uploadedBy)
+    {
+        // ---------------- Validation ----------------
+
+        if (!Enum.IsDefined(typeof(DocumentType), dto.DocumentType))
+        {
+            throw new ArgumentException($"Invalid document type: {dto.DocumentType}.");
+        }
+
+        var employeeExists = await _employeeRepo.TableNoTracking
+                             .AnyAsync(e => e.Id == dto.EmployeeId && e.IsDeleted != true);
+
+        if (!employeeExists)
+        {
+            throw new KeyNotFoundException($"Employee with Id {dto.EmployeeId} not found.");
+        }
+
+        // ---------------- Existing Document ----------------
+
+        var existingDocument = await _documentRepo.Table
+                               .FirstOrDefaultAsync(d =>
+                               d.EmployeeId == dto.EmployeeId &&
+                               d.DocumentType == dto.DocumentType.ToString() &&
+                               d.IsDeleted != true);
+
+        if (existingDocument != null)
+        {
+            existingDocument.IsDeleted = true;
+            existingDocument.DeletedDate = DateTime.UtcNow;
+            existingDocument.DeletedBy = uploadedBy;
+        }
+
+        // ---------------- Upload File ----------------
+
+        var folder = Path.Combine("EmployeesDocuments", dto.DocumentType.ToString());
+
+        FileUploadResult uploadResult;
+
+        uploadResult = await _fileStorageService.UploadAsync(dto.File, folder);
+
+        // ---------------- Create DB Record ----------------
+        try
+        {
+            var document = new Employeedocument
+            {
+            EmployeeId = dto.EmployeeId,
+
+            DocumentType = dto.DocumentType.ToString(),
+
+            DocumentName = uploadResult.OriginalFileName,
+
+            FilePath = uploadResult.RelativePath,
+
+            FileSize = (int)uploadResult.FileSize,
+
+            UploadedDate = DateTime.UtcNow,
+
+            CreatedDate = DateTime.UtcNow,
+
+            CreatedBy = uploadedBy
+            };
+
+        // ---------------- Save DB ----------------
+            await _documentRepo.AddAsync(document);
+
+            await _unitOfWork.SaveChangesAsync();
+
+            _logger.LogInformation(
+            "Document uploaded successfully. EmployeeId: {EmployeeId}, DocumentType: {DocumentType}, FileName: {FileName}",
+            dto.EmployeeId,
+            dto.DocumentType,
+            uploadResult.OriginalFileName);
+            return new DocumentResponseDto
+            {
+                Id = document.Id,
+                DocumentType = document.DocumentType,
+                DocumentName = document.DocumentName,
+                FileSize = document.FileSize,
+                UploadedDate = document.UploadedDate,
+                FileUrl = _urlHelper.BuildFullUrl(document.FilePath),
+            };
+
+        }
+        catch (Exception ex)
+        {
+            // DB failed → remove physical file
+            await _fileStorageService.DeleteAsync(
+                uploadResult.FullPath);
+
+            _logger.LogError(
+                ex,
+                "Failed to save document record. EmployeeId: {EmployeeId}, DocumentType: {DocumentType}",
+                dto.EmployeeId,
+                dto.DocumentType);
+
             throw;
         }
     }
-
     public async Task<EmployeeFullDetailsDto?> GetEmployeeFullDetailsByIdAsync(int employeeId)
     {
         var employee = await _employeeRepo.TableNoTracking
- .Include(e => e.Employeepersonaldetail)
- .Include(e => e.Employeedocuments)
- .Include(e => e.Department)
- .Include(e => e.Designation)
- .Include(e => e.Role)
- .AsSplitQuery()
- .FirstOrDefaultAsync(e => e.Id == employeeId && e.IsDeleted != true);
+                      .Include(e => e.Employeepersonaldetail)
+                      .Include(e => e.Employeedocuments)
+                      .Include(e => e.Department)
+                      .Include(e => e.Designation)
+                      .Include(e => e.Role)
+                      .AsSplitQuery()
+                      .FirstOrDefaultAsync(e => e.Id == employeeId && e.IsDeleted != true);
 
         if (employee == null)
             throw new KeyNotFoundException($"Employee with Id {employeeId} not found.");
@@ -284,28 +406,145 @@ public class EmployeeService : IEmployeeService
     }
 
 
-    public async Task<PagedResult<EmployeeResponseDto>> GetAllEmployeesAsync(PaginationRequest request)
+    public async Task<PagedResult<EmployeeResponseDto>> GetAllEmployeesAsync(EmployeeFilterRequest request)
     {
         var query = _employeeRepo.TableNoTracking
-            .Where(e => !e.IsDeleted)
-            .OrderBy(e => e.Id)
-            .Select(e => new EmployeeResponseDto
-            {
-                Id = e.Id,
-                EmpNo = e.EmpNo,
-                Name = e.Name,
-                Email = e.Email,
-                DepartmentName = e.Department != null ? e.Department.DepartmentName : null,
-                DesignationName = e.Designation != null ? e.Designation.DesignationName : null,
-                RoleName = e.Role != null ? e.Role.RoleName : null,
-                DateOfJoining = e.DateOfJoining
-            });
+            .Where(e => !e.IsDeleted);
 
-        return await query.ToPagedResultAsync(request);
+        if (!string.IsNullOrWhiteSpace(request.Name))
+        {
+            var name = request.Name.Trim();
+            query = query.Where(e => e.Name.Contains(name));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var email = request.Email.Trim();
+            query = query.Where(e =>e.Email.Contains(email));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.EmpNo))
+        {
+            var empNo = request.EmpNo.Trim();
+            query = query.Where(e => e.EmpNo.Contains(empNo));
+        }
+
+        if (request.DepartmentId.HasValue)
+        {
+            query = query.Where(e => e.DepartmentId == request.DepartmentId.Value);
+        }
+
+        if (request.RoleId.HasValue)
+        {
+            query = query.Where(e => e.RoleId == request.RoleId.Value);
+        }
+
+        if (request.DesignationId.HasValue)
+        {
+            query = query.Where(e => e.DesignationId == request.DesignationId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.MaritalStatus))
+        {
+            var status = request.MaritalStatus.Trim();
+            query = query.Where(e =>
+                e.Employeepersonaldetail != null &&
+                e.Employeepersonaldetail.MaritalStatus != null &&
+                e.Employeepersonaldetail.MaritalStatus.Contains(status));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Phone))
+        {
+            var phone = request.Phone.Trim();
+            query = query.Where(e => e.Phone != null && e.Phone.Contains(phone));
+        }
+
+        var sortOptions = new Dictionary<string, Expression<Func<Employee, object>>>
+        {
+            ["name"] = e => e.Name,
+            ["email"] = e => e.Email,
+            ["dateofjoining"] = e => e.DateOfJoining,
+            ["empno"] = e => e.EmpNo,
+            ["age"] = e => e.Age
+        };
+
+        query = query.ApplySorting(request, sortOptions, defaultSort: e => e.Id);
+
+        var resultQuery = query.Select(e => new EmployeeResponseDto
+        {
+            Id = e.Id,
+            EmpNo = e.EmpNo,
+            Name = e.Name,
+            Email = e.Email,
+            DepartmentName = e.Department.DepartmentName,
+            DesignationName=e.Designation.DesignationName,
+            RoleName =e.Role.RoleName,
+            DateOfJoining = e.DateOfJoining
+        });
+
+        return await resultQuery.ToPagedResultAsync(request);
     }
 
+    public async Task DeleteAsync(int id, int deletedBy)
+    {
 
+        var employee = await _employeeRepo.Table
+                     .Include(e => e.Employeedocuments)
+                     .Include(e => e.Employeepersonaldetail)
+                     .Include(e => e.User)
+                     .FirstOrDefaultAsync(e => e.IsDeleted != true && e.Id == id);
 
+        if (employee == null)
+            throw new KeyNotFoundException($"Profile not found Id {id} ");
+
+        await _unitOfWork.BeginTransactionAsync();
+
+        try
+        {
+            var deletedDate = DateTime.UtcNow;
+            employee.IsDeleted = true;
+            employee.IsActive = false;
+            employee.DeletedDate = deletedDate;
+            employee.DeletedBy = deletedBy;
+
+            var documents = employee.Employeedocuments
+                                 .Where(c => c.IsDeleted != true)
+                                 .ToList();
+            foreach (var item in documents)
+            {
+                item.IsDeleted = true;
+                item.DeletedBy = deletedBy;
+                item.DeletedDate = DateTime.UtcNow;
+                item.DeletedBy = deletedBy;
+            }
+            if (employee.Employeepersonaldetail != null) { 
+                 var personaldetails = employee.Employeepersonaldetail;
+                 personaldetails.IsDeleted = true;
+                 personaldetails.DeletedDate = deletedDate;
+                 personaldetails.DeletedBy = deletedBy;
+            }
+            if (employee.User != null)
+            {
+                var user = employee.User;
+                user.IsDeleted = true;
+                user.DeletedDate = deletedDate;
+            }
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+
+            _logger.LogInformation("Employee profile deleted — EmpNo: {EmpNo}, Email: {Email}, DeletedBy: {DeletedBy}",
+                employee.EmpNo, employee.Email, deletedBy);
+
+        }
+        catch (Exception ex)
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+
+            _logger.LogError(ex, "Failed to soft-delete employee — EmployeeId: {EmployeeId}, DeletedBy: {DeletedBy}", id, deletedBy);
+
+            throw;
+        }
+    }
 }
 
 

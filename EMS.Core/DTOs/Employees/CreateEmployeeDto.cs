@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using EMS.Core.DTOs.Documents;
+using EMS.Core.Enums;
 namespace EMS.Core.DTOs.Employees
 {
    
@@ -26,8 +27,7 @@ namespace EMS.Core.DTOs.Employees
             public int Age { get; set; }
 
             [Required(ErrorMessage = "Gender is required.")]
-            [RegularExpression("Male|Female|Other", ErrorMessage = "Gender must be Male, Female, or Other.")]
-            public string Gender { get; set; } = string.Empty;
+            public Gender Gender { get; set; }
 
             [Required(ErrorMessage = "Date of birth is required.")]
             public DateOnly DOB { get; set; }
@@ -39,10 +39,9 @@ namespace EMS.Core.DTOs.Employees
             public string? Address { get; set; }
 
             [Required(ErrorMessage = "Date of joining is required.")]
-            public DateTime DateOfJoining { get; set; }
+            public DateOnly DateOfJoining { get; set; }
 
-            [StringLength(5)]
-            public string? BloodGroup { get; set; }
+            public BloodGroup? BloodGroup { get; set; } 
 
             [Range(1, int.MaxValue, ErrorMessage = "DepartmentId is required.")]
             public int DepartmentId { get; set; }
@@ -55,7 +54,7 @@ namespace EMS.Core.DTOs.Employees
 
             [Required(ErrorMessage = "Manager is required.")]
             public int? ManagerId { get; set; }
-        public PersonalDetailsDto? PersonalDetails { get; set; }
+            public PersonalDetailsDto? PersonalDetails { get; set; }
 
            
         }

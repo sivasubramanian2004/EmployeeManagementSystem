@@ -22,7 +22,7 @@ namespace EMS.Core.DTOs.Employees
         public DateOnly DOB { get; set; }
         public string? Phone { get; set; }
         public string? Address { get; set; }
-        public DateTime DateOfJoining { get; set; }
+        public DateOnly DateOfJoining { get; set; }
         public string? BloodGroup { get; set; }
 
         //public int DepartmentId { get; set; }
