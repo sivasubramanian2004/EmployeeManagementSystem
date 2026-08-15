@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Linq.Expressions;
+using ClosedXML.Excel;
 
 namespace EMS.Service.Careers
 {   public class CareerService : ICareerService
@@ -382,80 +383,8 @@ namespace EMS.Service.Careers
         public async Task<PagedResult<CareerCandidatedata>> GetAllAsync(
         CareerFilterRequest request)
         {
-            var query = _careerRepo.TableNoTracking
-                .Where(c => !c.IsDeleted);
 
-            if (!string.IsNullOrWhiteSpace(request.Name))
-            {
-                var name = request.Name.Trim();
-
-                query = query.Where(c =>
-                    (c.FirstName + " " + c.LastName)
-                    .Contains(name));
-            }
-
-            if (!string.IsNullOrWhiteSpace(request.Email))
-            {
-                var email = request.Email.Trim();
-
-                query = query.Where(c =>
-                    c.Email.Contains(email));
-            }
-
-            if (!string.IsNullOrWhiteSpace(request.City))
-            {
-                var city = request.City.Trim();
-
-                query = query.Where(c =>
-                    c.City.Contains(city));
-            }
-
-            if (!string.IsNullOrWhiteSpace(request.JobApplicationPosition))
-            {
-                var position = request.JobApplicationPosition.Trim();
-
-                query = query.Where(c =>
-                    c.JobApplicationPosition.Contains(position));
-            }
-
-            if (request.MinExperience.HasValue)
-            {
-                query = query.Where(c =>
-                    c.Experience >= request.MinExperience.Value);
-            }
-
-            if (request.MaxExperience.HasValue)
-            {
-                query = query.Where(c =>
-                    c.Experience <= request.MaxExperience.Value);
-            }
-
-            if (!string.IsNullOrWhiteSpace(request.SkillSet))
-            {
-                var skill = request.SkillSet.Trim();
-
-                query = query.Where(c =>
-                    c.SkillSet.Contains(skill));
-            }
-
-            if (request.FromAppliedDate.HasValue)
-            {
-                var fromDate = request.FromAppliedDate.Value
-                    .ToDateTime(TimeOnly.MinValue);
-
-                query = query.Where(c =>
-                    c.CreatedDate >= fromDate);
-            }
-
-            if (request.ToAppliedDate.HasValue)
-            {
-                var toDate = request.ToAppliedDate.Value
-                    .AddDays(1)
-                    .ToDateTime(TimeOnly.MinValue);
-
-                query = query.Where(c =>
-                    c.CreatedDate < toDate);
-            }
+            var query = BuildCandidateQuery(request);
 
             // Career sorting options
             var sortOptions =
@@ -490,6 +419,162 @@ namespace EMS.Service.Careers
             return await resultQuery.ToPagedResultAsync(request);
         }
 
+        public async Task<byte[]> ExportCandidatesAsync(
+    CareerFilterRequest request)
+        {
+            var query = BuildCandidateQuery(request);
+
+            var candidates = await query
+                .OrderBy(c => c.Id)
+                .Select(c => new CareerCandidatedata
+                {
+                    Id = c.Id,
+
+                    Name = c.FirstName + " " + c.LastName,
+
+                    Email = c.Email,
+
+                    City = c.City,
+
+                    Mobile = c.Mobile,
+
+                    JobApplicationPosition = c.JobApplicationPosition,
+
+                    Experience = c.Experience,
+
+                    ExpectedSalary = c.ExpectedSalary,
+
+                    AppliedDate = c.CreatedDate.Date
+                })
+                .ToListAsync();
+
+            using var workbook = new XLWorkbook();
+
+            var worksheet = workbook.Worksheets.Add("Candidates");
+
+            // Headers
+            worksheet.Cell(1, 1).Value = "Id";
+            worksheet.Cell(1, 2).Value = "Name";
+            worksheet.Cell(1, 3).Value = "Email";
+            worksheet.Cell(1, 4).Value = "City";
+            worksheet.Cell(1, 5).Value = "Mobile";
+            worksheet.Cell(1, 6).Value = "Position";
+            worksheet.Cell(1, 7).Value = "Experience";
+            worksheet.Cell(1, 8).Value = "Expected Salary";
+            worksheet.Cell(1, 9).Value = "Applied Date";
+
+            // Data
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                var row = i + 2;
+                var candidate = candidates[i];
+
+                worksheet.Cell(row, 1).Value = candidate.Id;
+                worksheet.Cell(row, 2).Value = candidate.Name;
+                worksheet.Cell(row, 3).Value = candidate.Email;
+                worksheet.Cell(row, 4).Value = candidate.City;
+                worksheet.Cell(row, 5).Value = candidate.Mobile;
+                worksheet.Cell(row, 6).Value =
+                    candidate.JobApplicationPosition;
+                worksheet.Cell(row, 7).Value = candidate.Experience;
+                worksheet.Cell(row, 8).Value = candidate.ExpectedSalary;
+                worksheet.Cell(row, 9).Value = candidate.AppliedDate;
+            }
+
+            worksheet.Columns().AdjustToContents();
+
+            using var stream = new MemoryStream();
+
+            workbook.SaveAs(stream);
+
+            return stream.ToArray();
+        }
+        private IQueryable<Career> BuildCandidateQuery(CareerFilterRequest request)
+        {
+            var query = _careerRepo.TableNoTracking
+                .Where(c => !c.IsDeleted);
+
+            // Name
+            if (!string.IsNullOrWhiteSpace(request.Name))
+            {
+                var name = request.Name.Trim();
+
+                query = query.Where(c =>
+                    (c.FirstName + " " + c.LastName)
+                    .Contains(name));
+            }
+
+            // Email
+            if (!string.IsNullOrWhiteSpace(request.Email))
+            {
+                var email = request.Email.Trim();
+
+                query = query.Where(c =>
+                    c.Email.Contains(email));
+            }
+
+            // City
+            if (!string.IsNullOrWhiteSpace(request.City))
+            {
+                var city = request.City.Trim();
+
+                query = query.Where(c =>
+                    c.City.Contains(city));
+            }
+
+            // Job Posting
+            if (request.JobPostingId.HasValue)
+            {
+                query = query.Where(c =>
+                    c.JobPostingId == request.JobPostingId.Value);
+            }
+
+            // Minimum Experience
+            if (request.MinExperience.HasValue)
+            {
+                query = query.Where(c =>
+                    c.Experience >= request.MinExperience.Value);
+            }
+
+            // Maximum Experience
+            if (request.MaxExperience.HasValue)
+            {
+                query = query.Where(c =>
+                    c.Experience <= request.MaxExperience.Value);
+            }
+
+            // Skill Set
+            if (!string.IsNullOrWhiteSpace(request.SkillSet))
+            {
+                var skill = request.SkillSet.Trim();
+
+                query = query.Where(c =>
+                    c.SkillSet.Contains(skill));
+            }
+
+            // Applied Date From
+            if (request.FromAppliedDate.HasValue)
+            {
+                var fromDate = request.FromAppliedDate.Value
+                    .ToDateTime(TimeOnly.MinValue);
+
+                query = query.Where(c =>
+                    c.CreatedDate >= fromDate);
+            }
+
+            // Applied Date To
+            if (request.ToAppliedDate.HasValue)
+            {
+                var toDate = request.ToAppliedDate.Value
+                    .AddDays(1)
+                    .ToDateTime(TimeOnly.MinValue);
+
+                query = query.Where(c =>
+                    c.CreatedDate < toDate);
+            }
+
+            return query;
+        }
 
     }
 }

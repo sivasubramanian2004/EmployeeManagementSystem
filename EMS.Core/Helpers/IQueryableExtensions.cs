@@ -32,21 +32,26 @@ namespace EMS.Core.Helpers
         }
 
         public static IQueryable<T> ApplySorting<T>(
-          this IQueryable<T> query,
-          QueryParameterFilter request,
-          Dictionary<string, Expression<Func<T, object>>> sortOptions, Expression<Func<T, object>> defaultSort)
+     this IQueryable<T> query,
+     QueryParameterFilter request,
+     Dictionary<string, Expression<Func<T, object?>>> sortOptions,
+     Expression<Func<T, object?>> defaultSort)
         {
             if (string.IsNullOrWhiteSpace(request.SortBy))
-                return query;
+                return query.OrderBy(defaultSort);
 
             var sortBy = request.SortBy.Trim().ToLowerInvariant();
 
             if (sortOptions.TryGetValue(sortBy, out var sortExpression))
             {
-                return query.OrderBy(sortExpression);
+                return request.SortDescending
+                    ? query.OrderByDescending(sortExpression)
+                    : query.OrderBy(sortExpression);
             }
 
-            return query.OrderBy(defaultSort);
+            return request.SortDescending
+                ? query.OrderByDescending(defaultSort)
+                : query.OrderBy(defaultSort);
         }
     }
     
