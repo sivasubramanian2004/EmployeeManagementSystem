@@ -1,4 +1,5 @@
-﻿using System;
+﻿using EMS.Core.Enums;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -28,6 +29,7 @@ namespace EMS.Core.Helpers
         public int Skip => (PageNumber - 1) * PageSize;
 
         public string? SortBy { get; set; }
+        public bool SortDescending { get; set; }
     }
 
 
@@ -40,7 +42,7 @@ namespace EMS.Core.Helpers
 
         public string? City { get; set; }
 
-        public string? JobApplicationPosition { get; set; }
+        public int? JobPostingId { get; set; }
 
         public decimal? MinExperience { get; set; }
 
@@ -64,5 +66,36 @@ namespace EMS.Core.Helpers
         public string? MaritalStatus { get; set; }
         
         public string? Phone { get; set; }
+    }
+
+    public class JobPostingFilterRequest : QueryParameterFilter
+    {
+        public string? Search { get; set; }
+
+        public int? DepartmentId { get; set; }
+
+        public EmploymentType? EmploymentType { get; set; }
+
+        public WorkMode? WorkMode { get; set; }
+
+        public string? Status { get; set; }
+
+        public string? Location { get; set; }
+
+        public decimal? MinSalary { get; set; }
+
+        public decimal? MaxSalary { get; set; }
+
+        public decimal? MinExperience { get; set; }
+
+        public decimal? MaxExperience { get; set; }
+
+        public DateOnly? PostedFrom { get; set; }
+
+        public DateOnly? PostedTo { get; set; }
+
+        public DateOnly? ClosingFrom { get; set; }
+
+        public DateOnly? ClosingTo { get; set; }
     }
 }

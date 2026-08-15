@@ -7,7 +7,6 @@ using EMS.Data;
 using EMS.Data.Models;
 using EMS.Data.Repositories;
 using EMS.Data.UnitOfWork;
-using EMS.Service.Documents;
 using EMS.Service.FileStorage;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -96,9 +95,26 @@ public class EmployeeService : IEmployeeService
             .FirstOrDefaultAsync(r => r.Id == dto.RoleId && r.IsDeleted != true)
             ?? throw new KeyNotFoundException($"Role with Id {dto.RoleId} not found.");
 
-        // ---------- Transaction: Employee + PersonalDetails together ----------
+        if (dto.PersonalDetails.MaritalStatus.HasValue &&
+               !Enum.IsDefined(dto.PersonalDetails.MaritalStatus.Value))
+        {
+            throw new ArgumentException(
+                $"Invalid marital status: {dto.PersonalDetails.MaritalStatus.Value}.");
+        }
+        if (dto.BloodGroup.HasValue && !Enum.IsDefined(typeof(BloodGroup), dto.BloodGroup))
+        {
+            throw new ArgumentException(
+                $"Invalid blood group: {dto.BloodGroup}.");
+        }
 
-        await _unitOfWork.BeginTransactionAsync();
+        if (!Enum.IsDefined(typeof(Gender), dto.Gender))
+        {
+            throw new ArgumentException(
+                $"Invalid gender: {dto.Gender}.");
+        }
+            // ---------- Transaction: Employee + PersonalDetails together ----------
+
+            await _unitOfWork.BeginTransactionAsync();
         try
         {
             var employee = new Employee
@@ -107,13 +123,13 @@ public class EmployeeService : IEmployeeService
                 EmpNo = dto.EmpNo,
                 Name = dto.Name,
                 Age = dto.Age,
-                Gender = dto.Gender,
+                Gender = dto.Gender.ToString(),
                 Dob = dto.DOB,
                 Email = dto.Email,
                 Phone = dto.Phone,
                 Address = dto.Address,
                 DateOfJoining = dto.DateOfJoining,
-                BloodGroup = dto.BloodGroup,
+                BloodGroup = dto.BloodGroup.ToString(),
                 DepartmentId = dto.DepartmentId,
                 DesignationId = dto.DesignationId,
                 RoleId = dto.RoleId,
@@ -133,7 +149,7 @@ public class EmployeeService : IEmployeeService
                 var personalDetail = new Employeepersonaldetail
                 {
                     Employee = employee,
-                    MaritalStatus = pd.MaritalStatus,
+                    MaritalStatus = pd.MaritalStatus.ToString(),
                     Nationality = pd.Nationality,
                     AadharNumber = pd.AadharNumber,
                     PanNumber = pd.PanNumber,

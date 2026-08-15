@@ -17,5 +17,9 @@ namespace EMS.Service.Careers
 
         Task<PagedResult<CareerCandidatedata>> GetAllAsync(CareerFilterRequest request);
 
+        Task<byte[]> ExportCandidatesAsync(CareerFilterRequest request);
+
+
+
     }
 }

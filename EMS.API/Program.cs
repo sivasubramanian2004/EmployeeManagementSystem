@@ -1,4 +1,5 @@
-﻿using EMS.API.Middleware;
+﻿using EMS.API.Controllers;
+using EMS.API.Middleware;
 using EMS.Core.DTOs.Documents;
 using EMS.Core.Helpers;
 using EMS.Data;
@@ -9,10 +10,10 @@ using EMS.Service.Authentication;
 using EMS.Service.Careers;
 using EMS.Service.Departments;
 using EMS.Service.Designations;
-using EMS.Service.Documents;
 using EMS.Service.Email;
 using EMS.Service.Employees;
 using EMS.Service.FileStorage;
+using EMS.Service.JobPostings;
 using EMS.Service.Leave;
 using EMS.Service.Roles;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -91,6 +92,7 @@ builder.Services.AddScoped<IFileStorageService, FileStorageService>();
 builder.Services.AddScoped<ILeaveRequestService, LeaveRequestService>();
 //careers
 builder.Services.AddScoped<ICareerService, CareerService>();
+builder.Services.AddScoped<IJobPostingService, JobPostingService>();
 
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.Configure<FileSettings>(builder.Configuration.GetSection("FileSettings"));

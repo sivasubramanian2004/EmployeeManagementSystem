@@ -1,4 +1,5 @@
-﻿using System;
+﻿using EMS.Core.Enums;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -9,8 +10,8 @@ namespace EMS.Core.DTOs.Employees
 {
     public class PersonalDetailsDto
     {
-        [RegularExpression("Single|Married|Divorced|Widowed", ErrorMessage = "Invalid marital status.")]
-        public string? MaritalStatus { get; set; }
+        
+        public MaritalStatus? MaritalStatus { get; set; }
 
         [StringLength(50)]
         public string? Nationality { get; set; }

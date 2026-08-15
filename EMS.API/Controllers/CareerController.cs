@@ -68,7 +68,19 @@ namespace EMS.API.Controllers;
         return Ok(response);
 
     }
-    
+    [HttpGet("Download-Candidates")]
+    [Authorize(Roles = "Admin,HR,Employee")]
+    public async Task<IActionResult> DownloadCandidates(
+    [FromQuery] CareerFilterRequest request)
+    {
+        var fileBytes = await _careerService
+            .ExportCandidatesAsync(request);
+
+        return File(
+            fileBytes,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"Candidates_{DateTime.Now:yyyyMMddHHmmss}.xlsx");
+    }
     [HttpDelete("Delete-Candidate-Profile/{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
