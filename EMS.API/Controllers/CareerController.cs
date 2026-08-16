@@ -90,7 +90,7 @@ namespace EMS.API.Controllers;
         {
 
             Success = true,
-            Message= "Candidate deleted Successfully",
+            Message= "Candidate deleted Successfull",
             Data = null,
             Errors = null,
             StatusCode = 200
