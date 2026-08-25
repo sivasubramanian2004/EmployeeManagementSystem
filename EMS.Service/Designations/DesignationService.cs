@@ -36,7 +36,7 @@ namespace EMS.Service.Designations
 
             var designation = new Designation
             {
-                DesignationName = dto.DesignationName,
+                DesignationName = dto.DesignationName.Trim().ToUpper(),
                 CreatedDate = DateTime.UtcNow,
                 CreatedBy= createdBy
 
@@ -62,7 +62,7 @@ namespace EMS.Service.Designations
             var designation = await _designationRepo.Table.FirstOrDefaultAsync(d => d.Id == id && d.IsDeleted != true);
             if (designation == null)
                 throw new KeyNotFoundException($"Designation with ID { id } not found.");
-            designation.DesignationName = dto.DesignationName.Trim();
+            designation.DesignationName = dto.DesignationName.Trim().ToUpper();
             designation.ModifiedDate = DateTime.UtcNow;
             designation.ModifiedBy = updatedBy;
             var result = await _designationRepo.UpdateAsync(designation);

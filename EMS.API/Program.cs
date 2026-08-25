@@ -151,6 +151,7 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
 // TEMPORARY DEBUG LINE
 Console.WriteLine("========================================");
 Console.WriteLine("ACTUAL CONNECTION STRING: " + app.Configuration.GetConnectionString("DefaultConnection"));

@@ -85,4 +85,21 @@ public class AuthController : ControllerBase
         };
         return Ok(response);
     }
+    [Authorize]
+    [HttpPut("Update-Auth/{id:int}")]
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateAuthDto dto)
+    {
+       
+        var result = await _authService.UpdateAsync(id, dto);
+        var response = new ApiResponse<AuthResponseDto>
+        {
+            Success = true,
+            Message = "User details updated successfully.",
+            Data = result,
+            Errors = null,
+            StatusCode = 200
+        };
+        return Ok(response);
+    }
+
 }

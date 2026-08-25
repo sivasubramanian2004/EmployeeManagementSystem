@@ -35,7 +35,7 @@ public partial class Employee
 
     public int DesignationId { get; set; }
 
-    public int RoleId { get; set; }
+  //  public int RoleId { get; set; }
 
     public bool? IsActive { get; set; }
 

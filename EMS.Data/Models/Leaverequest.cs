@@ -39,6 +39,8 @@ public partial class Leaverequest
 
     public DateTime? DeletedDate { get; set; }
 
+    public Employee? ApprovedByEmployee { get; set; }
+
     public virtual Employee Employee { get; set; } = null!;
 
     public virtual Leavetype LeaveType { get; set; } = null!;

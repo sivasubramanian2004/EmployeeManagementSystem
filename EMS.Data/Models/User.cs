@@ -15,10 +15,6 @@ public partial class User
 
     public string Role { get; set; } = null!;
 
-    public DateOnly? DateOfBirth { get; set; }
-
-    public string? Address { get; set; }
-
     public bool? IsActive { get; set; }
 
     public DateTime CreatedDate { get; set; }

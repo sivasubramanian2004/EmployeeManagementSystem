@@ -38,7 +38,7 @@ namespace EMS.Core.DTOs.Careers
 
         public string? CurrentSalary { get; set; }
 
-        public decimal? ExpectedSalary { get; set; }
+        public string? ExpectedSalary { get; set; }
 
         public string? NoticePeriod { get; set; }
 
@@ -94,7 +94,7 @@ namespace EMS.Core.DTOs.Careers
 
         public decimal Experience { get; set; }
 
-        public decimal? ExpectedSalary { get; set; }
+        public string? ExpectedSalary { get; set; }
 
         public DateTime AppliedDate { get; set; }
 
