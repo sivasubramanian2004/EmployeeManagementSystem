@@ -30,7 +30,7 @@ namespace EMS.Service.Departments
                 throw new InvalidOperationException($"Department {dto.DepartmentName} already existed");
             var department = new Department
             {
-                DepartmentName = dto.DepartmentName,
+                DepartmentName = dto.DepartmentName.Trim().ToUpper(),
                 CreatedDate = DateTime.Now,
                 CreatedBy = CreatedBy,
 
@@ -61,7 +61,7 @@ namespace EMS.Service.Departments
                                   FirstOrDefaultAsync(d => d.Id == id && d.IsDeleted != true);
             if (department == null)
                 throw new KeyNotFoundException($"No Department found with ID {id}");
-            department.DepartmentName = dto.DepartmentName;
+            department.DepartmentName = dto.DepartmentName.Trim().ToUpper();
             department.ModifiedDate = DateTime.UtcNow;
             department.ModifiedBy = UpdatedBy;
             var result = await _departmentRepo.UpdateAsync(department);

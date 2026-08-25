@@ -22,6 +22,14 @@ namespace EMS.Core.Enums
         Closed = 2,
         OnHold = 3
     }
+
+    public enum Status
+    {
+        Approved = 1,
+        Pending=2,
+        Rejected = 3      
+      
+    }
     public enum Gender
     {
         Male = 1,

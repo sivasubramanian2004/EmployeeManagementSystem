@@ -10,16 +10,17 @@ namespace EMS.Core.DTOs.Careers;
 
 public class CreateCareerDto
 {
-    [Required]
+    [Required(ErrorMessage ="FirstName is Required")]
     [StringLength(100)]
     public string FirstName { get; set; } = string.Empty;
 
-    [Required]
+    [Required(ErrorMessage ="LastName is Required")]
     [StringLength(100)]
     public string? LastName { get; set; }
 
-    [Required]
-    [EmailAddress]
+    [Required(ErrorMessage ="Email Address is Required")]
+    [EmailAddress(ErrorMessage ="Invalid Email Address")]
+    [StringLength(150)]
     public string Email { get; set; } = string.Empty;
 
     [Phone]
@@ -28,39 +29,46 @@ public class CreateCareerDto
     [StringLength(250)]
     public string? Street { get; set; }
 
-    [Required]
+    [Required(ErrorMessage ="City is Required")]
+    [StringLength(100)]
     public string City { get; set; } = string.Empty;
 
-    [Required]
+    [Required(ErrorMessage ="Pincode is Required")]
+    [StringLength(20)]
     public string Pincode { get; set; } = string.Empty;
 
+    [StringLength(100)]
     public string? State { get; set; }
-
+    [StringLength(100)]
     public string? Country { get; set; }
 
-    [Required]
-    public string JobApplicationPosition { get; set; } = string.Empty;
+    [Required(ErrorMessage ="JobPostion is Required")]
+    public int JobPostingId { get; set; }
 
+    [EmailAddress(ErrorMessage ="Invalid Email Address")]
+    [StringLength(0)]
     public string?  ReferralEmail { get; set; }
 
 
-    [Required]
+    [Required(ErrorMessage ="Experience is Required")]
     [Range(0, 50)]
     public decimal Experience { get; set; }
 
+    [StringLength(150)]
     public string? CurrentDesignation { get; set; }
 
+    [StringLength(150)]
     public string? CurrentCompany { get; set; }
-
-    [Range(0, double.MaxValue)]
+    [StringLength(50)]
     public string? CurrentSalary { get; set; }
 
-    [Range(0, double.MaxValue)]
-    public decimal? ExpectedSalary { get; set; }
-
+    [StringLength(50)]
+    public string? ExpectedSalary { get; set; }
+    [StringLength(50)]
     public string? NoticePeriod { get; set; }
 
-    [Required]
+    [Required(ErrorMessage ="Skillset are Required")]
+    [StringLength(5000)]
     public string SkillSet { get; set; } = string.Empty;
 
     [Url]
@@ -71,7 +79,7 @@ public class CreateCareerDto
 
     public IFormFile? Photo { get; set; }
 
-    [Required]
+    [Required(ErrorMessage ="Resume is Required")]
     public IFormFile Resume { get; set; } = null!;
 
     public List<CareerEducationDto> Educations { get; set; } = new();

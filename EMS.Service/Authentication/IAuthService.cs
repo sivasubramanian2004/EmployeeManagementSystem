@@ -1,9 +1,10 @@
-﻿using System;
+﻿using DocumentFormat.OpenXml.Office2010.Excel;
+using EMS.Core.DTOs.Auth;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using EMS.Core.DTOs.Auth;
 
 namespace EMS.Service.Authentication
 {
@@ -14,5 +15,7 @@ namespace EMS.Service.Authentication
        
         Task ForgotPasswordAsync(ForgotPasswordDto dto);
         Task ResetPasswordAsync(ResetPasswordDto dto);
+
+        Task<AuthResponseDto> UpdateAsync(int id,UpdateAuthDto dto);
     }
 }

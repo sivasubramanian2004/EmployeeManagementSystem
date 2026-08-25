@@ -25,7 +25,7 @@ public partial class Career
 
     public string? Country { get; set; }
 
-    public string JobApplicationPosition { get; set; } = null!;
+   // public string JobApplicationPosition { get; set; } = null!;
 
     public decimal Experience { get; set; }
 
@@ -35,7 +35,7 @@ public partial class Career
 
     public string? CurrentSalary { get; set; }
 
-    public decimal? ExpectedSalary { get; set; }
+    public string? ExpectedSalary { get; set; }
 
     public string? NoticePeriod { get; set; }
 
@@ -65,9 +65,9 @@ public partial class Career
 
     public string? ReferralEmail { get; set; }
 
-    public int? JobPostingId { get; set; }
+    public int  JobPostingId { get; set; }
 
     public virtual ICollection<Careereducation> Careereducations { get; set; } = new List<Careereducation>();
 
-    public virtual Jobposting? JobPosting { get; set; }
+    public virtual Jobposting JobPosting { get; set; } = null!;
 }

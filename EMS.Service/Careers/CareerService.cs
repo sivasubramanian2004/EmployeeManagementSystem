@@ -26,6 +26,7 @@ namespace EMS.Service.Careers
         private readonly ILogger<CareerService> _logger;
         private readonly IUrlHelperService _urlHelper;
         private readonly IFileStorageService _fileStorageService;
+        private readonly IRepository<Jobposting> _jobRepo;
         public CareerService(
             IRepository<Career> careerRepo,
              IRepository<Careereducation> educationRepo,
@@ -33,7 +34,8 @@ namespace EMS.Service.Careers
             IEmailService emailService,
             ILogger<CareerService> logger,
             IUrlHelperService urlHelper,
-            IFileStorageService fileStorageService)
+            IFileStorageService fileStorageService,
+            IRepository<Jobposting> jobRepo )
         {
             _careerRepo = careerRepo;
             _educationRepo = educationRepo;
@@ -42,16 +44,21 @@ namespace EMS.Service.Careers
             _logger = logger;
             _urlHelper = urlHelper;
             _fileStorageService = fileStorageService;
+            _jobRepo = jobRepo;
         }
 
         public async Task<CareerResponseDto> CreateAsync(CreateCareerDto dto)
         {
-            var emailExists = await _careerRepo.TableNoTracking
-                             .AnyAsync(x => x.Email == dto.Email && x.JobApplicationPosition == dto.JobApplicationPosition && !x.IsDeleted);
-
+            var emailExists = await _careerRepo.Table
+                              .Include(c=>c.JobPosting)
+                              .AnyAsync(x => x.Email == dto.Email && x.JobPostingId == dto.JobPostingId && !x.IsDeleted);
             if (emailExists)
-                throw new InvalidOperationException(
-                    $"A career application  already exists with this email address for the role {dto.JobApplicationPosition}.");
+                throw new InvalidOperationException($"A career application  already exists with this email address for the role {dto.JobPostingId}.");
+
+            var jobType=await _jobRepo.TableNoTracking.FirstOrDefaultAsync(j=>j.Id==dto.JobPostingId && !j.IsDeleted);
+
+            if(jobType==null)    
+                   throw new KeyNotFoundException($"Job posting with ID {dto.JobPostingId} not found.");
 
             if (dto.Educations == null || dto.Educations.Count == 0)
                 throw new ArgumentException("At least one education detail is required.");
@@ -91,7 +98,7 @@ namespace EMS.Service.Careers
                     Pincode = dto.Pincode,
                     State = dto.State,
                     Country = dto.Country,
-                    JobApplicationPosition = dto.JobApplicationPosition,
+                    JobPostingId = dto.JobPostingId,
                     ReferralEmail = dto.ReferralEmail,
                     Experience = dto.Experience,
                     CurrentDesignation = dto.CurrentDesignation,
@@ -103,8 +110,6 @@ namespace EMS.Service.Careers
                     LinkedInUrl = dto.LinkedInUrl,
                     GitHubUrl = dto.GitHubUrl,
                     PhotoPath = photoPath?.RelativePath,
-
-                    //RoleName = e.Role != null ? e.Role.RoleName : null,
                     ResumePath = resumePath.RelativePath,
                     CreatedDate = DateTime.UtcNow
                 };
@@ -174,7 +179,7 @@ namespace EMS.Service.Careers
                                 Thank you for your interest in joining our team.
                                 We are pleased to inform you that your application
                                 for the position of
-                                <strong>{dto.JobApplicationPosition}</strong>
+                                <strong>{jobType.Title}</strong>
                                 has been successfully received.
                             </p>
 
@@ -186,7 +191,7 @@ namespace EMS.Service.Careers
 
                                 <p style='margin:5px 0; font-size:14px;'>
                                     Position:
-                                    <strong>{dto.JobApplicationPosition}</strong>
+                                    <strong>{jobType.Title}</strong>
                                 </p>
 
                                 <p style='margin:5px 0; font-size:14px;'>
@@ -255,7 +260,7 @@ namespace EMS.Service.Careers
                     Id = career.Id,
                     Email = career.Email,
                     Mobile = career.Mobile,
-                    JobApplicationPosition = career.JobApplicationPosition,
+                    JobPostingPosition = jobType.Title,
                     PhotoUrl = _urlHelper.BuildFullUrl(career.PhotoPath),
                     ResumeUrl = _urlHelper.BuildFullUrl(career.ResumePath)
                 };
@@ -272,7 +277,7 @@ namespace EMS.Service.Careers
 
                 _logger.LogError(ex,
                     "Failed to create career application for Email: {Email}, JobApplicationPosition: {JobApplicationPosition}",
-                    dto.Email, dto.JobApplicationPosition);
+                    dto.Email, dto.JobPostingId);
                 throw;
             }
         }
@@ -281,6 +286,7 @@ namespace EMS.Service.Careers
             var candidate = await _careerRepo.TableNoTracking
                           .Include(c => c.Careereducations
                           .Where(e => !e.IsDeleted))
+                          .Include(c => c.JobPosting)
                           .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
 
             if (candidate == null)
@@ -298,7 +304,7 @@ namespace EMS.Service.Careers
                 Pincode = candidate.Pincode,
                 State = candidate.State,
                 Country = candidate.Country,
-                JobApplicationPosition = candidate.JobApplicationPosition,
+                JobApplicationPosition = candidate.JobPosting.Title,
                 Experience = candidate.Experience,
                 CurrentDesignation = candidate.CurrentDesignation,
                 CurrentCompany = candidate.CurrentCompany,
@@ -393,14 +399,14 @@ namespace EMS.Service.Careers
                     ["name"] = c => c.FirstName,
                     ["email"] = c => c.Email,
                     ["city"] = c => c.City,
-                    ["position"] = c => c.JobApplicationPosition,
+                    ["position"] = c => c.JobPostingId,
                     ["experience"] = c => c.Experience,
                     ["applieddate"] = c => c.CreatedDate
                 };
 
             // Generic sorting
             query = query.ApplySorting(request, sortOptions, defaultSort: c => c.Id);
-
+            
             // Projection
             var resultQuery = query.Select(c => new CareerCandidatedata
             {
@@ -409,7 +415,7 @@ namespace EMS.Service.Careers
                 Email = c.Email,
                 City = c.City,
                 Mobile = c.Mobile,
-                JobApplicationPosition = c.JobApplicationPosition,
+                JobApplicationPosition = c.JobPosting.Title,
                 Experience = c.Experience,
                 ExpectedSalary = c.ExpectedSalary,
                 AppliedDate = c.CreatedDate.Date
@@ -438,7 +444,7 @@ namespace EMS.Service.Careers
 
                     Mobile = c.Mobile,
 
-                    JobApplicationPosition = c.JobApplicationPosition,
+                    JobApplicationPosition = c.JobPosting.Title,
 
                     Experience = c.Experience,
 

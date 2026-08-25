@@ -1,14 +1,17 @@
 ﻿
+    using EMS.Core.DTOs.Leave;
+using EMS.Core.Enums;
     using EMS.Core.Helpers;
     using EMS.Data.Models;
-    using EMS.Core.DTOs.Leave;
-    using global::EMS.Data.Repositories;
-    using global::EMS.Data.UnitOfWork;
-    using global::EMS.Service.Email;
+    using EMS.Data.Repositories;
+    using EMS.Data.UnitOfWork;
+    using EMS.Service.Email;
+using Microsoft.AspNetCore.Http.HttpResults;
     using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query;
     using Microsoft.Extensions.Logging;
 
-    namespace EMS.Service.Leave;
+namespace EMS.Service.Leave;
 
     public class LeaveRequestService : ILeaveRequestService
     {
@@ -45,20 +48,22 @@
             throw new ArgumentException("Cannot apply leave for a past date.");
 
         var employee = await _employeeRepo.TableNoTracking
-            .FirstOrDefaultAsync(e => e.Id == employeeId && !e.IsDeleted)
-            ?? throw new KeyNotFoundException("Employee profile not found.");
+                       .FirstOrDefaultAsync(e => e.Id == employeeId && e.IsDeleted!=true);
 
-        var leaveTypeExists = await _leaveTypeRepo.TableNoTracking
-            .AnyAsync(l => l.Id == dto.LeaveTypeId && !l.IsDeleted);
+        if(employee==null)  
+              throw new KeyNotFoundException("Employee profile not found.");
 
-        if (!leaveTypeExists)
+        var leaveType= await _leaveTypeRepo.TableNoTracking
+                              .FirstOrDefaultAsync(l => l.Id == dto.LeaveTypeId && l.IsDeleted!=true);
+
+        if (leaveType==null)
             throw new KeyNotFoundException($"Leave Type {dto.LeaveTypeId} not found.");
 
         var hasOverlap = await _leaveRequestRepo.TableNoTracking
             .AnyAsync(l =>
                 l.EmployeeId == employeeId &&
                 !l.IsDeleted &&
-                (l.Status == "Pending" || l.Status == "Approved") &&
+                (l.Status == Status.Pending.ToString() || l.Status == Status.Approved.ToString()) &&
                 dto.StartDate <= l.EndDate &&
                 dto.EndDate >= l.StartDate);
 
@@ -66,6 +71,7 @@
             throw new InvalidOperationException("Leave already exists for the selected dates.");
 
         var totalDays = (dto.EndDate.DayNumber - dto.StartDate.DayNumber) + 1;
+
         var leaveRequest = new Leaverequest
         {
             EmployeeId = employeeId,
@@ -73,207 +79,221 @@
             StartDate = dto.StartDate,
             EndDate = dto.EndDate,
             Reason = dto.Reason,
-            Status = "Pending",
+            Status = Status.Pending.ToString(),
             CreatedDate = DateTime.UtcNow,
             CreatedBy = employeeId
         };
+        await _leaveRequestRepo.InsertAsync(leaveRequest);
 
-        await _leaveRequestRepo.AddAsync(leaveRequest);
-        await _unitOfWork.SaveChangesAsync();
-
+        _logger.LogInformation(
+            "Leave applied — EmployeeId: {EmployeeId}, LeaveTypeId: {LeaveTypeId}, StartDate: {StartDate}, EndDate: {EndDate}, TotalDays: {TotalDays}",
+            employeeId, dto.LeaveTypeId, dto.StartDate, dto.EndDate, totalDays);
         if (employee.ManagerId.HasValue)
         {
             var manager = await _employeeRepo.TableNoTracking
-                .FirstOrDefaultAsync(x => x.Id == employee.ManagerId.Value);
+                .FirstOrDefaultAsync(e => e.Id == employee.ManagerId.Value);
 
-            if (manager != null && !string.IsNullOrWhiteSpace(manager.Email))
+            if (!string.IsNullOrEmpty(manager?.Email))
             {
-                var body = $@"
-            <h3>New Leave Request</h3>
-            <p><strong>{employee.Name}</strong> applied for leave.</p>
-            <p><b>Dates:</b> {dto.StartDate:dd-MMM-yyyy} - {dto.EndDate:dd-MMM-yyyy}</p>
-            <p><b>Total Days:</b> {totalDays}</p>
-            <p><b>Reason:</b> {dto.Reason}</p>";
+                try
+                {
+                    var body = $@"
+                    <h3>New Leave Request</h3>
+                    <p><strong>{employee.Name}</strong> has applied for leave.</p>
+                    <p>Leave Type: {leaveType.LeaveTypeName}</p>
+                    <p>Dates: {dto.StartDate:dd-MMM-yyyy} to {dto.EndDate:dd-MMM-yyyy} ({totalDays} day(s))</p>
+                    <p>Reason: {dto.Reason ?? "Not specified"}</p>";
 
-                await _emailService.SendEmailAsync(manager.Email, "New Leave Request", body);
+                    await _emailService.SendEmailAsync(manager.Email, "New Leave Request - EMS", body);
+                }
+                catch (Exception emailEx)
+                {
+                    // Email failure should NOT roll back the leave request — log and continue
+                    _logger.LogError(emailEx,
+                        "Failed to send leave notification email — EmployeeId: {EmployeeId}, ManagerId: {ManagerId}",
+                        employeeId, employee.ManagerId);
+                }
             }
-        }
-
-        return await MapToResponseDto(leaveRequest.Id);
-    }
-
-/*    // ---------- GET MY LEAVES (employee's own requests) ----------
-    public async Task<List<LeaveRequestResponseDto>> GetMyLeavesAsync(int employeeId)
-    {
-        return await _leaveRequestRepo.TableNoTracking
-            .Include(x => x.Employee)
-            .Include(x => x.LeaveType)
-            .Include(x => x.ApprovedByNavigation)
-            .Where(x => x.EmployeeId == employeeId && !x.IsDeleted)
-            .OrderByDescending(x => x.CreatedDate)
-            .Select(x => new LeaveRequestResponseDto
-            {
-                Id = x.Id,
-                EmployeeId = x.EmployeeId,
-                EmployeeName = x.Employee.Name,
-                LeaveTypeName = x.LeaveType.LeaveTypeName,
-                StartDate = x.StartDate,
-                EndDate = x.EndDate,
-                TotalDays = x.EndDate.DayNumber - x.StartDate.DayNumber + 1,
-                Reason = x.Reason,
-                Status = x.Status,
-                ApprovedByName = x.ApprovedByNavigation != null
-                    ? x.ApprovedByNavigation.Name
-                    : null,
-                ActionDate = x.ActionDate,
-                CreatedDate = x.CreatedDate,
-                RejectionReason = x.RejectionReason,
-                
-            })
-            .ToListAsync();
-    }
-*/
-    // ---------- GET PENDING APPROVALS (for a manager) ----------
-    public async Task<List<LeaveRequestResponseDto>> GetPendingApprovalsAsync(int managerEmployeeId)
-    {
-        return await _leaveRequestRepo.TableNoTracking
-            .Include(x => x.Employee)
-            .Include(x => x.LeaveType)
-            .Where(x => x.Employee.ManagerId == managerEmployeeId &&
-                        x.Status == "Pending" &&
-                        !x.IsDeleted)
-            .OrderBy(x => x.StartDate)
-            .Select(x => new LeaveRequestResponseDto
-            {
-                Id = x.Id,
-                EmployeeId = x.EmployeeId,
-                EmployeeName = x.Employee.Name,
-                LeaveTypeName = x.LeaveType.LeaveTypeName,
-                StartDate = x.StartDate,
-                EndDate = x.EndDate,
-                TotalDays = x.EndDate.DayNumber - x.StartDate.DayNumber + 1,
-                Reason = x.Reason,
-                Status = x.Status,
-                CreatedDate = x.CreatedDate
-            })
-            .ToListAsync();
-    }
-    // ---------- APPROVE ----------
-    public async Task<LeaveRequestResponseDto> ApproveLeaveAsync(int leaveRequestId, int managerEmployeeId)
-    {
-        var leaveRequest = await _leaveRequestRepo.Table   // tracked — we're modifying it
-            .Include(l => l.Employee)
-            .FirstOrDefaultAsync(l => l.Id == leaveRequestId && l.IsDeleted != true)
-            ?? throw new KeyNotFoundException($"Leave request with Id {leaveRequestId} not found.");
-
-        if (leaveRequest.Employee.ManagerId != managerEmployeeId)
-            throw new UnauthorizedAccessException("You are not authorized to approve this employee's leave.");
-
-        if (leaveRequest.Status != "Pending")
-            throw new InvalidOperationException($"This leave request has already been {leaveRequest.Status.ToLower()}.");
-
-        leaveRequest.Status = "Approved";
-        leaveRequest.ApprovedBy = managerEmployeeId;
-        leaveRequest.ActionDate = DateTime.UtcNow;
-        leaveRequest.ModifiedDate = DateTime.UtcNow;
-        leaveRequest.ModifiedBy = managerEmployeeId;
-
-        _leaveRequestRepo.UpdateEntity(leaveRequest);
-        await _unitOfWork.SaveChangesAsync();
-
-        _logger.LogInformation(
-            "Leave approved — LeaveRequestId: {Id}, EmployeeId: {EmployeeId}, ApprovedBy: {ManagerId}",
-            leaveRequestId, leaveRequest.EmployeeId, managerEmployeeId);
-
-        if (!string.IsNullOrEmpty(leaveRequest.Employee.Email))
-        {
-            var body = $@"
-                <h3>Leave Request Approved</h3>
-                <p>Your leave request from <strong>{leaveRequest.StartDate:dd-MMM-yyyy}</strong> 
-                   to <strong>{leaveRequest.EndDate:dd-MMM-yyyy}</strong> has been approved.</p>";
-
-            await _emailService.SendEmailAsync(leaveRequest.Employee.Email, "Leave Request Approved - EMS", body);
-        }
-
-        return await MapToResponseDto(leaveRequest.Id);
-    }
-
-    // ---------- REJECT ----------
-    public async Task<LeaveRequestResponseDto> RejectLeaveAsync(int leaveRequestId, int managerEmployeeId, RejectLeaveDto dto)
-        {
-            var leaveRequest = await _leaveRequestRepo.Table
-                .Include(l => l.Employee)
-                .FirstOrDefaultAsync(l => l.Id == leaveRequestId && l.IsDeleted != true)
-                ?? throw new KeyNotFoundException($"Leave request with Id {leaveRequestId} not found.");
-
-            if (leaveRequest.Employee.ManagerId != managerEmployeeId)
-                throw new UnauthorizedAccessException("You are not authorized to reject this employee's leave.");
-
-            if (leaveRequest.Status != "Pending")
-                throw new InvalidOperationException($"This leave request has already been {leaveRequest.Status.ToLower()}.");
-
-            leaveRequest.Status = "Rejected";
-            leaveRequest.ApprovedBy = managerEmployeeId;
-            leaveRequest.ActionDate = DateTime.UtcNow;
-            leaveRequest.RejectionReason = dto.RejectionReason;
-            leaveRequest.ModifiedDate = DateTime.UtcNow;
-            leaveRequest.ModifiedBy = managerEmployeeId;
-
-            _leaveRequestRepo.UpdateEntity(leaveRequest);
-            await _unitOfWork.SaveChangesAsync();
-
-            _logger.LogInformation(
-                "Leave rejected — LeaveRequestId: {Id}, EmployeeId: {EmployeeId}, RejectedBy: {ManagerId}",
-                leaveRequestId, leaveRequest.EmployeeId, managerEmployeeId);
-
-            if (!string.IsNullOrEmpty(leaveRequest.Employee.Email))
-            {
-                var body = $@"
-                <h3>Leave Request Rejected</h3>
-                <p>Your leave request from <strong>{leaveRequest.StartDate:dd-MMM-yyyy}</strong> 
-                   to <strong>{leaveRequest.EndDate:dd-MMM-yyyy}</strong> has been rejected.</p>
-                <p>Reason: {dto.RejectionReason}</p>";
-
-                await _emailService.SendEmailAsync(leaveRequest.Employee.Email, "Leave Request Rejected - EMS", body);
-            }
-
-            return await MapToResponseDto(leaveRequest.Id);
-        }
-
-    // ---------- Shared mapping helper ----------
-    private async Task<LeaveRequestResponseDto> MapToResponseDto(int leaveRequestId)
-    {
-        var leave = await _leaveRequestRepo.TableNoTracking
-            .Include(x => x.Employee)
-            .Include(x => x.LeaveType)
-            .FirstAsync(x => x.Id == leaveRequestId);
-
-        string? approvedByName = null;
-
-        if (leave.ApprovedBy.HasValue)
-        {
-            approvedByName = await _employeeRepo.TableNoTracking
-                .Where(e => e.Id == leave.ApprovedBy.Value)
-                .Select(e => e.Name)
-                .FirstOrDefaultAsync();
         }
 
         return new LeaveRequestResponseDto
         {
-            Id = leave.Id,
-            EmployeeId = leave.EmployeeId,
-            EmployeeName = leave.Employee.Name,
-            LeaveTypeName = leave.LeaveType.LeaveTypeName,
-            StartDate = leave.StartDate,
-            EndDate = leave.EndDate,
-            TotalDays = leave.EndDate.DayNumber - leave.StartDate.DayNumber + 1,
-            Reason = leave.Reason,
-            Status = leave.Status,
-            ApprovedByName = approvedByName,
-            ActionDate = leave.ActionDate,
-            RejectionReason = leave.RejectionReason,
-            CreatedDate = leave.CreatedDate
+            Id = leaveRequest.Id,
+            EmployeeId = employee.Id,
+            EmployeeName = employee.Name,
+            LeaveTypeName = leaveType.LeaveTypeName,
+            StartDate = leaveRequest.StartDate,
+            EndDate = leaveRequest.EndDate,
+            TotalDays = totalDays,
+            Reason = leaveRequest.Reason,
+            Status = leaveRequest.Status,
+            CreatedDate = leaveRequest.CreatedDate
         };
     }
+
+
+    public async Task<LeaveRequestResponseDto> GetLeavesAsync(int id)
+    {
+
+        var employee = await _employeeRepo.TableNoTracking
+                       .FirstOrDefaultAsync(e => e.Id == id && e.IsDeleted != true);
+
+        if (employee == null)
+            throw new KeyNotFoundException("Employee Id not found");
+
+        var leaveRequest = await _leaveRequestRepo.TableNoTracking
+                            .Include(l => l.LeaveType)
+                            .Include(l=>l.Employee)
+                            .FirstOrDefaultAsync(l => l.EmployeeId == id && l.IsDeleted != true);
+
+        var manager = await _employeeRepo.TableNoTracking
+                            .Include(e=>e.Leaverequests)
+                           
+                            .FirstOrDefaultAsync(e => e.Id == employee.ManagerId && e.IsDeleted != true);
+        return new LeaveRequestResponseDto
+        {
+
+            Id = employee.Id,
+            EmployeeId = employee.Id,
+            EmployeeName = employee.Name,
+            Email = employee.Email,
+            LeaveTypeName = leaveRequest.LeaveType.LeaveTypeName,
+            StartDate = leaveRequest.StartDate,
+            EndDate = leaveRequest.EndDate,
+            Reason = leaveRequest.Reason,
+            Status = leaveRequest.Status,
+            ApprovedByName = leaveRequest.ApprovedByEmployee != null
+                    ? leaveRequest.ApprovedByEmployee.Name
+                    : null,
+            ActionDate = leaveRequest.ActionDate,
+            RejectionReason=leaveRequest.RejectionReason,
+            CreatedDate = leaveRequest.CreatedDate,
+
+        };
+
+    }
+    // ---------- APPROVE ----------
+    public async Task<LeaveRequestResponseDto> ApproveLeaveAsync(int leaveRequestId, int managerEmployeeId, UpdateleaveDto dto, int UpdatedBy)
+    {
+        var leave = await _leaveRequestRepo.Table
+                       .Include(l => l.LeaveType)
+                       .Include(l => l.Employee)
+                       .FirstOrDefaultAsync(e => e.Id == leaveRequestId && e.IsDeleted != true);
+
+        if (leave == null)
+            throw new KeyNotFoundException("Employee not applied for leave.");
+
+        var manager = await _employeeRepo.TableNoTracking
+                       .FirstOrDefaultAsync(e => e.Id == managerEmployeeId && e.IsDeleted != true);
+
+        if (leave.Employee.ManagerId != managerEmployeeId)
+            throw new UnauthorizedAccessException("You are not authorized to approve this employee's leave.");
+
+        if (leave.Status != Status.Pending.ToString())
+            throw new InvalidOperationException($"This leave request has already been {leave.Status.ToLower()}.");
+
+        if (!Enum.IsDefined(typeof(Status), dto.Status))
+        {
+            throw new ArgumentException(
+                $"Invalid gender: {dto.Status}.");
+        }
+
+        //manager approve or reject leave
+        leave.Status = dto.Status.ToString();
+        leave.ApprovedBy = managerEmployeeId;
+        leave.ActionDate = DateTime.UtcNow;
+        leave.RejectionReason = dto.RejectionReason;
+        //meta data
+        leave.ModifiedDate = DateTime.UtcNow;
+        leave.ModifiedBy = UpdatedBy;
+        await _leaveRequestRepo.UpdateAsync(leave);
+
+        _logger.LogInformation(
+           "Leave approved — LeaveRequestId: {Id}, EmployeeId: {EmployeeId}, ApprovedBy: {ManagerId}",
+           leaveRequestId, leave.EmployeeId, managerEmployeeId);
+
+
+        if (!string.IsNullOrEmpty(leave.Employee.Email))
+        {
+            var body = $@"
+                <h3>Leave Request {leave.Status}</h3>
+                <p>Your leave request from <strong>{leave.StartDate:dd-MMM-yyyy}</strong> 
+                   to <strong>{leave.EndDate:dd-MMM-yyyy}</strong> has been approved.</p>";
+
+            await _emailService.SendEmailAsync(leave.Employee.Email, "Leave Request {leave.Status}  - EMS", body);
+        }
+
+        return new LeaveRequestResponseDto
+        {
+
+
+            Id = leave.Employee.Id,
+            EmployeeId = leave.Employee.Id,
+            EmployeeName = leave.Employee.Name,
+            Email = leave.Employee.Email,
+            LeaveTypeName = leave.LeaveType.LeaveTypeName,
+            Reason = leave.Reason,
+            Status = leave.Status,
+
+            ApprovedByName = manager?.Name,
+            ActionDate = leave.ActionDate,
+            RejectionReason = leave .RejectionReason,
+
+        };
+
+    }
+
+    public async Task<PagedResult<LeaveRequestResponseDto>> GetAllAsync(
+    LeaveFilterRequestDto request,
+    int managerEmployeeId)
+    {
+        var query = _leaveRequestRepo.TableNoTracking
+            .Include(l => l.Employee)
+            .Include(l => l.LeaveType)
+            .Include(l => l.ApprovedByEmployee)
+            .Where(l =>
+                !l.IsDeleted &&
+                l.Employee.ManagerId == managerEmployeeId);
+
+        // Status filter
+        if (request.Status.HasValue)
+        {
+            var status = request.Status.Value.ToString();
+
+            query = query.Where(l => l.Status == status);
+        }
+
+        var resultQuery = query
+            .Select(l => new LeaveRequestResponseDto
+            {
+                Id = l.Id,
+                EmployeeId = l.EmployeeId,
+                EmployeeName = l.Employee.Name,
+                Email = l.Employee.Email,
+                LeaveTypeName = l.LeaveType.LeaveTypeName,
+
+                StartDate = l.StartDate,
+                EndDate = l.EndDate,
+
+                TotalDays =
+                    (l.EndDate.DayNumber - l.StartDate.DayNumber) + 1,
+
+                Reason = l.Reason,
+                Status = l.Status,
+
+                ApprovedByName = l.ApprovedByEmployee != null
+                    ? l.ApprovedByEmployee.Name
+                    : null,
+
+                ActionDate = l.ActionDate,
+                RejectionReason = l.RejectionReason,
+                CreatedDate = l.CreatedDate
+            });
+
+        return await resultQuery.ToPagedResultAsync(request);
+    }
+
+
+
 }
 

@@ -1,4 +1,5 @@
-﻿using EMS.Core.DTOs.Designation;
+﻿using DocumentFormat.OpenXml.Wordprocessing;
+using EMS.Core.DTOs.Designation;
 using EMS.Core.DTOs.Documents;
 using EMS.Core.DTOs.Employees;
 using EMS.Core.Enums;
@@ -76,12 +77,17 @@ public class EmployeeService : IEmployeeService
         if (empNoExists)
             throw new InvalidOperationException($"Employee number '{dto.EmpNo}' is already in use.");
 
-        var managerExists = await _employeeRepo.TableNoTracking
-        .AnyAsync(e => e.Id == dto.ManagerId.Value && e.IsDeleted != true);
+        if (dto.ManagerId.HasValue)
+        {
+            var managerExists = await _employeeRepo.TableNoTracking
+                .AnyAsync(e => e.Id == dto.ManagerId.Value && !e.IsDeleted);
 
-        if (!managerExists)
-            throw new KeyNotFoundException($"Manager with Id {dto.ManagerId} not found.");
+            if (!managerExists)
+            {
+                throw new KeyNotFoundException($"Manager with Id {dto.ManagerId.Value} not found.");
 
+            }
+        }
         // Pre-validation — fetch WITH names, instead of just checking existence
         var department = await _context.Departments
             .FirstOrDefaultAsync(d => d.Id == dto.DepartmentId && d.IsDeleted != true)
@@ -91,12 +97,8 @@ public class EmployeeService : IEmployeeService
             .FirstOrDefaultAsync(d => d.Id == dto.DesignationId && d.IsDeleted != true)
             ?? throw new KeyNotFoundException($"Designation with Id {dto.DesignationId} not found.");
 
-        var role = await _context.Roles
-            .FirstOrDefaultAsync(r => r.Id == dto.RoleId && r.IsDeleted != true)
-            ?? throw new KeyNotFoundException($"Role with Id {dto.RoleId} not found.");
-
-        if (dto.PersonalDetails.MaritalStatus.HasValue &&
-               !Enum.IsDefined(dto.PersonalDetails.MaritalStatus.Value))
+        if (dto.PersonalDetails?.MaritalStatus.HasValue == true &&
+         !Enum.IsDefined(dto.PersonalDetails.MaritalStatus.Value))
         {
             throw new ArgumentException(
                 $"Invalid marital status: {dto.PersonalDetails.MaritalStatus.Value}.");
@@ -132,7 +134,7 @@ public class EmployeeService : IEmployeeService
                 BloodGroup = dto.BloodGroup.ToString(),
                 DepartmentId = dto.DepartmentId,
                 DesignationId = dto.DesignationId,
-                RoleId = dto.RoleId,
+              //  RoleId = dto.RoleId,
                 ManagerId = dto.ManagerId,
                 IsActive = true,
                 CreatedDate = DateTime.UtcNow,
@@ -201,7 +203,6 @@ public class EmployeeService : IEmployeeService
                 Email = employee.Email ?? string.Empty,
                 DepartmentName = department.DepartmentName,     // ← already fetched, no extra query
                 DesignationName = designation.DesignationName,   // ← already fetched, no extra query
-                RoleName = role.RoleName,                          // ← already fetched, no extra query
                 DateOfJoining = employee.DateOfJoining,
                
             };
@@ -218,12 +219,11 @@ public class EmployeeService : IEmployeeService
     public async Task<DocumentResponseDto> UploadDocumentAsync(UploadDocumentDto dto, int uploadedBy)
     {
         // ---------------- Validation ----------------
-
-        if (!Enum.IsDefined(typeof(DocumentType), dto.DocumentType))
+        if (!Enum.IsDefined(typeof(EMS.Core.Enums.DocumentType), dto.DocumentType))
         {
-            throw new ArgumentException($"Invalid document type: {dto.DocumentType}.");
+            throw new ArgumentException(
+                $"Invalid document type: {dto.DocumentType}.");
         }
-
         var employeeExists = await _employeeRepo.TableNoTracking
                              .AnyAsync(e => e.Id == dto.EmployeeId && e.IsDeleted != true);
 
@@ -342,7 +342,7 @@ public class EmployeeService : IEmployeeService
             BloodGroup = employee.BloodGroup,
             DepartmentName= employee.Department?.DepartmentName,
             DesignationName= employee.Designation?.DesignationName,
-            RoleName= employee.Role?.RoleName
+         //   RoleName= employee.Role?.RoleName
           
         };
 
@@ -434,11 +434,6 @@ public class EmployeeService : IEmployeeService
             query = query.Where(e => e.DepartmentId == request.DepartmentId.Value);
         }
 
-        if (request.RoleId.HasValue)
-        {
-            query = query.Where(e => e.RoleId == request.RoleId.Value);
-        }
-
         if (request.DesignationId.HasValue)
         {
             query = query.Where(e => e.DesignationId == request.DesignationId.Value);
@@ -478,7 +473,7 @@ public class EmployeeService : IEmployeeService
             Email = e.Email,
             DepartmentName = e.Department.DepartmentName,
             DesignationName=e.Designation.DesignationName,
-            RoleName =e.Role.RoleName,
+            //RoleName =e.Role.RoleName,
             DateOfJoining = e.DateOfJoining
         });
 
@@ -520,6 +515,7 @@ public class EmployeeService : IEmployeeService
             if (employee.Employeepersonaldetail != null) { 
                  var personaldetails = employee.Employeepersonaldetail;
                  personaldetails.IsDeleted = true;
+                 personaldetails.IsActive = false;
                  personaldetails.DeletedDate = deletedDate;
                  personaldetails.DeletedBy = deletedBy;
             }
@@ -527,6 +523,7 @@ public class EmployeeService : IEmployeeService
             {
                 var user = employee.User;
                 user.IsDeleted = true;
+                user.IsActive = false;
                 user.DeletedDate = deletedDate;
             }
             await _unitOfWork.SaveChangesAsync();
@@ -543,6 +540,135 @@ public class EmployeeService : IEmployeeService
             _logger.LogError(ex, "Failed to soft-delete employee — EmployeeId: {EmployeeId}, DeletedBy: {DeletedBy}", id, deletedBy);
 
             throw;
+        }
+    }
+
+
+    public async Task<EmployeeResponseDto> UpdateEmployeeAsync(int id, UpdateEmployeeDto dto, int updatedBy) { 
+    
+    
+     var employee = await _employeeRepo.Table
+                   .Include(e => e.Employeepersonaldetail)
+                   .FirstOrDefaultAsync(e => e.Id == id && e.IsDeleted != true);
+     
+    if(employee==null)
+            throw new KeyNotFoundException($"Employee with Id {id} not found.");
+
+        if (dto.ManagerId.HasValue)
+        {
+            var managerExists = await _employeeRepo.TableNoTracking
+                .AnyAsync(e => e.Id == dto.ManagerId.Value && !e.IsDeleted);
+
+            if (!managerExists)
+            {
+                throw new KeyNotFoundException($"Manager with Id {dto.ManagerId.Value} not found.");
+
+            }
+        }
+        // Pre-validation — fetch WITH names, instead of just checking existence
+        var department = await _context.Departments
+            .FirstOrDefaultAsync(d => d.Id == dto.DepartmentId && d.IsDeleted != true)
+            ?? throw new KeyNotFoundException($"Department with Id {dto.DepartmentId} not found.");
+
+        var designation = await _context.Designations
+            .FirstOrDefaultAsync(d => d.Id == dto.DesignationId && d.IsDeleted != true)
+            ?? throw new KeyNotFoundException($"Designation with Id {dto.DesignationId} not found.");
+
+        var role = await _context.Roles
+            .FirstOrDefaultAsync(r => r.Id == dto.RoleId && r.IsDeleted != true)
+            ?? throw new KeyNotFoundException($"Role with Id {dto.RoleId} not found.");
+
+        if (dto.PersonalDetails?.MaritalStatus.HasValue == true &&
+         !Enum.IsDefined(dto.PersonalDetails.MaritalStatus.Value))
+        {
+            throw new ArgumentException(
+                $"Invalid marital status: {dto.PersonalDetails.MaritalStatus.Value}.");
+        }
+        if (dto.BloodGroup.HasValue && !Enum.IsDefined(typeof(BloodGroup), dto.BloodGroup))
+        {
+            throw new ArgumentException(
+                $"Invalid blood group: {dto.BloodGroup}.");
+        }
+
+        if (!Enum.IsDefined(typeof(Gender), dto.Gender))
+        {
+            throw new ArgumentException(
+                $"Invalid gender: {dto.Gender}.");
+        }
+        await _unitOfWork.BeginTransactionAsync();
+        try
+        {
+            employee.Name = dto.Name;
+            employee.Age = dto.Age;
+            employee.Gender = dto.Gender.ToString();
+            employee.Email = dto.Email;
+            employee.Phone = dto.Phone;
+            employee.Address = dto.Address;
+            employee.Dob = dto.DOB;
+            employee.DateOfJoining = dto.DateOfJoining;
+            employee.BloodGroup = dto.BloodGroup?.ToString();
+            employee.DepartmentId = dto.DepartmentId;
+            employee.DesignationId = dto.DesignationId;
+            employee.ManagerId = dto.ManagerId;
+            employee.ModifiedDate = DateTime.UtcNow;
+            employee.ModifiedBy = updatedBy;
+            if (employee.Employeepersonaldetail != null && dto.PersonalDetails != null)
+            {
+                var personaldetails = employee.Employeepersonaldetail;
+                personaldetails.MaritalStatus = dto.PersonalDetails.MaritalStatus?.ToString();
+                personaldetails.Nationality = dto.PersonalDetails.Nationality;
+                personaldetails.AadharNumber = dto.PersonalDetails.AadharNumber;
+                personaldetails.PanNumber = dto.PersonalDetails.PanNumber;
+                personaldetails.EmergencyContactName = dto.PersonalDetails.EmergencyContactName;
+                personaldetails.EmergencyContactPhone = dto.PersonalDetails.EmergencyContactPhone;
+                personaldetails.EmergencyContactRelation = dto.PersonalDetails.EmergencyContactRelation;
+                personaldetails.BankAccountNumber = dto.PersonalDetails.BankAccountNumber;
+                personaldetails.BankName = dto.PersonalDetails.BankName;
+                personaldetails.IfscCode = dto.PersonalDetails.IfscCode;
+                personaldetails.District = dto.PersonalDetails.District;
+                personaldetails.State = dto.PersonalDetails.State;
+                personaldetails.Pincode = dto.PersonalDetails.Pincode;
+                personaldetails.FatherName = dto.PersonalDetails.FatherName;
+                personaldetails.FatherOccupation = dto.PersonalDetails.FatherOccupation;
+                personaldetails.FatherMobileNo = dto.PersonalDetails.FatherMobileNo;
+                personaldetails.MotherName = dto.PersonalDetails.MotherName;
+                personaldetails.MotherOccupation = dto.PersonalDetails.MotherOccupation;
+                personaldetails.SiblingCount = dto.PersonalDetails.SiblingCount;
+                personaldetails.FamilyIncome = dto.PersonalDetails.FamilyIncome;
+                personaldetails.IsFirstGraduate = dto.PersonalDetails.IsFirstGraduate;
+                personaldetails.SslcSchoolName = dto.PersonalDetails.SslcSchoolName;
+                personaldetails.SslcPercentage = dto.PersonalDetails.SslcPercentage;
+                personaldetails.HscOrDiplomaSchoolName = dto.PersonalDetails.HscOrDiplomaSchoolName;
+                personaldetails.HscOrDiplomaPercentage = dto.PersonalDetails.HscOrDiplomaPercentage;
+                personaldetails.UgCollegeName = dto.PersonalDetails.UgCollegeName;
+                personaldetails.UgCgpa = dto.PersonalDetails.UgCgpa;
+                personaldetails.PgDegreeCollegeName = dto.PersonalDetails.PgDegreeCollegeName;
+                personaldetails.PgCgpa = dto.PersonalDetails.PgCgpa;
+                personaldetails.ModifiedDate = DateTime.UtcNow;
+                personaldetails.ModifiedBy = updatedBy;
+
+            }
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+            _logger.LogInformation("Employee profile updated — EmpNo: {EmpNo}, Email: {Email}, UpdatedBy: {UpdatedBy}",
+                        employee.EmpNo, employee.Email, updatedBy);
+
+            return new EmployeeResponseDto
+            {
+
+                Id = employee.Id,
+                EmpNo = employee.EmpNo,
+                Name = employee.Name,
+                Email = employee.Email
+
+            };
+        }
+        catch (Exception ex)
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            _logger.LogError(ex, "Failed to update employee profile — EmployeeId: {EmployeeId}, UpdatedBy: {UpdatedBy}", id, updatedBy);
+            throw;
+
         }
     }
 }

@@ -39,8 +39,6 @@ namespace EMS.Service.Authentication
                 Email = dto.Email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
                 Role = "Employee",              // ← always forced, never trust client input
-                DateOfBirth = dto.DateOfBirth,
-                Address = dto.Address ?? string.Empty,
                 IsActive = true,
                 CreatedDate = DateTime.UtcNow
             };
@@ -83,6 +81,39 @@ namespace EMS.Service.Authentication
                 Role = user.Role,
                 Token = token,
                 ExpiresAt = expiresAt
+            };
+        }
+        public async Task<AuthResponseDto> UpdateAsync(int id, UpdateAuthDto dto)
+        {
+            var user = await _userRepo.Table
+                .Include(u=>u.Role)
+                .FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
+
+            if (user == null)
+                throw new KeyNotFoundException("User not found.");
+
+            user.Name = dto.Name;
+
+            if (!string.IsNullOrWhiteSpace(dto.Password))
+            {
+                user.PasswordHash =
+                    BCrypt.Net.BCrypt.HashPassword(dto.Password);
+            }
+
+            if (!string.IsNullOrWhiteSpace(dto.RoleName))
+            {
+                var role = dto.RoleName.ToString().Trim();
+                user.Role = role;
+            }
+            
+            user.ModifiedDate = DateTime.UtcNow;
+            await _userRepo.InsertAsync(user);
+
+            return new AuthResponseDto
+            {
+                UserId = user.Id,
+                Name = user.Name,
+                Role = user.Role
             };
         }
         public async Task ForgotPasswordAsync(ForgotPasswordDto dto) {
