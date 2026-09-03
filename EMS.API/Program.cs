@@ -24,6 +24,7 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+
 // ============================
 // 1. SERILOG CONFIGURATION
 // ============================
@@ -150,6 +151,12 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// TEMPORARY DEBUG LINE
+Console.WriteLine("========================================");
+Console.WriteLine("ACTUAL CONNECTION STRING: " + app.Configuration.GetConnectionString("DefaultConnection"));
+Console.WriteLine("========================================");
+
 
 // ============================
 // MIDDLEWARE PIPELINE (ORDER MATTERS)

@@ -7,9 +7,6 @@ using System.Threading.Tasks;
 
 namespace EMS.Core.DTOs.Employees
 {
-    
-   
-
     public class EmployeeFullDetailsDto
     {
         public int Id { get; set; }
@@ -32,7 +29,6 @@ namespace EMS.Core.DTOs.Employees
         public string? DesignationName { get; set; }  // same reasoning
 
         //public int RoleId { get; set; }
-        public string? RoleName { get; set; }
 
         public PersonalDetailsResponseDto? PersonalDetails { get; set; }
 

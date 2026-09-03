@@ -43,9 +43,7 @@ public partial class EmsDbContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseMySql("server=localhost;port=3306;database=EmployeeManagementSystemDB;user=root;password=sivas200424mcr104", Microsoft.EntityFrameworkCore.ServerVersion.Parse("8.0.41-mysql"));
+  
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -75,7 +73,7 @@ public partial class EmsDbContext : DbContext
             entity.Property(e => e.Experience).HasPrecision(5, 2);
             entity.Property(e => e.FirstName).HasMaxLength(100);
             entity.Property(e => e.GitHubUrl).HasMaxLength(500);
-            entity.Property(e => e.JobApplicationPosition).HasMaxLength(150);
+         //   entity.Property(e => e.JobApplicationPosition).HasMaxLength(150);
             entity.Property(e => e.LastName).HasMaxLength(100);
             entity.Property(e => e.LinkedInUrl).HasMaxLength(500);
             entity.Property(e => e.Mobile).HasMaxLength(20);
@@ -159,7 +157,7 @@ public partial class EmsDbContext : DbContext
 
             entity.HasIndex(e => e.DesignationId, "FK_Employees_Designation");
 
-            entity.HasIndex(e => e.RoleId, "FK_Employees_Role");
+          //  entity.HasIndex(e => e.RoleId, "FK_Employees_Role");
 
             entity.HasIndex(e => e.UserId, "UserId").IsUnique();
 
@@ -191,10 +189,10 @@ public partial class EmsDbContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_Employees_Designation");
 
-            entity.HasOne(d => d.Role).WithMany(p => p.Employees)
-                .HasForeignKey(d => d.RoleId)
-                .OnDelete(DeleteBehavior.ClientSetNull)
-                .HasConstraintName("FK_Employees_Role");
+           // entity.HasOne(d => d.Role).WithMany(p => p.Employees)
+            //    .HasForeignKey(d => d.RoleId)
+            //    .OnDelete(DeleteBehavior.ClientSetNull)
+            //    .HasConstraintName("FK_Employees_Role");
 
             entity.HasOne(d => d.User).WithOne(p => p.Employee)
                 .HasForeignKey<Employee>(d => d.UserId)
@@ -411,7 +409,7 @@ public partial class EmsDbContext : DbContext
 
             entity.HasIndex(e => e.Email, "Email").IsUnique();
 
-            entity.Property(e => e.Address).HasMaxLength(500);
+           
             entity.Property(e => e.CreatedDate)
                 .HasDefaultValueSql("CURRENT_TIMESTAMP")
                 .HasColumnType("datetime");

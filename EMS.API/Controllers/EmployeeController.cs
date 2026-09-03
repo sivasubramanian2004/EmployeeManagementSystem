@@ -40,7 +40,6 @@ namespace EMS.API.Controllers
 
         [HttpPost("upload")]
         [Authorize]
-        [RequestSizeLimit(10 * 1024 * 1024)]   // 10 MB hard cap at the request level (extra safety, beyond service-level check)
         public async Task<IActionResult> Upload([FromForm] UploadDocumentDto dto)
         {
             var uploadedBy = GetCurrentUserId();
@@ -106,8 +105,21 @@ namespace EMS.API.Controllers
                 StatusCode = 200
             };
             return Ok(response);
-            
-        
+        }
+        [Authorize]
+        [HttpPut("Update-Employee/{id:int}")]
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateEmployeeDto dto)
+        {
+            var updatedBy = GetCurrentUserId();
+            var result = await _Employeeservice.UpdateEmployeeAsync(id, dto, updatedBy);
+            var response = new ApiResponse<EmployeeResponseDto>
+            {
+                Success = true,
+                Message = "Employee profile updated successfully.",
+                Data = result,
+                StatusCode = 200
+            };
+            return Ok(response);
         }
 
     }

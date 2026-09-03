@@ -13,7 +13,7 @@ namespace EMS.Core.DTOs.Employees
         {
             [Required(ErrorMessage = "Email is required.")]
             [EmailAddress(ErrorMessage = "Invalid email format.")]
-            public string Email { get; set; } = string.Empty;
+            public string Email { get; set; } = null!;
 
             [Required(ErrorMessage = "Employee number is required.")]
             [StringLength(20, MinimumLength = 3, ErrorMessage = "Employee number must be between 3 and 20 characters.")]
@@ -49,10 +49,10 @@ namespace EMS.Core.DTOs.Employees
             [Range(1, int.MaxValue, ErrorMessage = "Valid DesignationId is required.")]
             public int DesignationId { get; set; }
 
-            [Range(1, int.MaxValue, ErrorMessage = "Valid RoleId is required.")]
-            public int RoleId { get; set; }
+           // [Range(1, int.MaxValue, ErrorMessage = "Valid RoleId is required.")]
+          //  public int RoleId { get; set; }
 
-            [Required(ErrorMessage = "Manager is required.")]
+          
             public int? ManagerId { get; set; }
             public PersonalDetailsDto? PersonalDetails { get; set; }
 

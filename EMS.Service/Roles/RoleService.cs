@@ -36,7 +36,7 @@ namespace EMS.Service.Roles
 
             var role = new Role
             {
-                RoleName = dto.RoleName,
+                RoleName = dto.RoleName.Trim().ToUpper(),
                 CreatedDate = DateTime.UtcNow,
                 CreatedBy = createdBy
 
@@ -65,7 +65,7 @@ namespace EMS.Service.Roles
             var role = await _roleRepo.Table.FirstOrDefaultAsync(d => d.Id == id && d.IsDeleted != true);
             if (role == null)
                 throw new KeyNotFoundException($"Role with ID {id} not found.");
-            role.RoleName = dto.RoleName.Trim();
+            role.RoleName = dto.RoleName.Trim().ToUpper();
             role.ModifiedDate = DateTime.UtcNow;
             role.ModifiedBy = updatedBy;
             var result = await _roleRepo.UpdateAsync(role);

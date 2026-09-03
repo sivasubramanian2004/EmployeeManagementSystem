@@ -98,4 +98,11 @@ namespace EMS.Core.Helpers
 
         public DateOnly? ClosingTo { get; set; }
     }
+
+    public class LeaveFilterRequestDto : QueryParameterFilter
+    {
+        public Status? Status { get; set; }
+    }
+
+
 }

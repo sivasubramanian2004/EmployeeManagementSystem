@@ -15,7 +15,7 @@ namespace EMS.Core.DTOs.Careers
 
             public string? Mobile { get; set; }
 
-            public string JobApplicationPosition { get; set; } = string.Empty;
+            public string JobPostingPosition { get; set; } = string.Empty;
 
             //public string? LinkedInUrl { get; set; }
 

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.ComponentModel.DataAnnotations;
+using EMS.Core.Enums;
 
 namespace EMS.Core.DTOs.Leave
 {
@@ -25,6 +26,33 @@ namespace EMS.Core.DTOs.Leave
         public string? Reason { get; set; }
     }
 
+
+    public class UpdateleaveDto
+    {
+
+        
+        public int LeaveTypeId { get; set; }
+       
+        public DateOnly StartDate { get; set; }
+
+       
+        public DateOnly EndDate { get; set; }
+        public string? Reason { get; set; }
+        [Required(ErrorMessage="Status is Required")]
+        public Status Status { get; set; }
+
+        public string ApprovedBy { get; set; } = string.Empty;
+
+        public string? ApprovedByReason { get; set; } = string.Empty;
+
+        public DateTime? ActionDate { get; set; }
+
+        public string? RejectionReason { get; set; }
+
+
+    }
+
+    
     public class RejectLeaveDto
     {
         [Required(ErrorMessage = "Rejection reason is required.")]
@@ -37,6 +65,8 @@ namespace EMS.Core.DTOs.Leave
         public int Id { get; set; }
 
         public int EmployeeId { get; set; }
+
+        public string Email { get; set; }
 
         public string EmployeeName { get; set; } = string.Empty;
 

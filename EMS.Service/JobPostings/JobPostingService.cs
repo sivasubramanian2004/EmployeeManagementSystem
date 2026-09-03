@@ -30,7 +30,7 @@ namespace EMS.Service.JobPostings
             }
             if (!Enum.IsDefined(typeof(WorkMode), dto.WorkMode))
             {
-                throw new ArgumentException($"Invalid document type: {dto.EmploymentType}.");
+                throw new ArgumentException($"Invalid document type: {dto.WorkMode}.");
             }
 
             // In JobPostingService.CreateAsync

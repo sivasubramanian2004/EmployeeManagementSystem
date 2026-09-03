@@ -23,13 +23,15 @@ public class LeaveRequestController : BaseController
     private async Task<int> GetCurrentEmployeeIdAsync()
     {
         var userId = GetCurrentUserId();
+
         var employee = await _employeeRepo.TableNoTracking
             .FirstOrDefaultAsync(e => e.UserId == userId && e.IsDeleted != true)
+
             ?? throw new KeyNotFoundException("No employee profile linked to your account.");
         return employee.Id;
     }
 
-    [HttpPost("apply")]
+    [HttpPost("Apply-Leave")]
     [Authorize]
     public async Task<IActionResult> Apply([FromBody] ApplyLeaveDto dto)
     {
@@ -45,44 +47,31 @@ public class LeaveRequestController : BaseController
         });
     }
 
-  /*  [HttpGet("my-leaves")]
-    [Authorize]
-    public async Task<IActionResult> GetMyLeaves()
-    {
-        var employeeId = await GetCurrentEmployeeIdAsync();
-        var result = await _service.GetMyLeavesAsync(employeeId);
 
-        return Ok(new ApiResponse<object>
-        {
-            Success = true,
-            Message = "Your leave requests fetched successfully.",
-            Data = result,
-            StatusCode = 200
-        });
-    }
-*/
-    [HttpGet("pending-approvals")]
+     [Authorize(Roles ="Manager, HR")]
+     [HttpGet("Get-leaves/{id:int}")]  
+      public async Task<IActionResult> GetLeaves(int id)
+      {
+         // var employeeId = await GetCurrentEmployeeIdAsync();
+          var result = await _service.GetLeavesAsync(id);
+
+          return Ok(new ApiResponse<object>
+          {
+              Success = true,
+              Message = "leave requests fetched successfully.",
+              Data = result,
+              StatusCode = 200
+          });
+      }
+  
+  
+    [HttpPut("approve{id:int}")]
     [Authorize(Roles = "Manager")]
-    public async Task<IActionResult> GetPendingApprovals()
+    public async Task<IActionResult> Approve(int id, UpdateleaveDto dto )
     {
         var managerEmployeeId = await GetCurrentEmployeeIdAsync();
-        var result = await _service.GetPendingApprovalsAsync(managerEmployeeId);
-
-        return Ok(new ApiResponse<object>
-        {
-            Success = true,
-            Message = "Pending approvals fetched successfully.",
-            Data = result,
-            StatusCode = 200
-        });
-    }
-
-    [HttpPut("{id}/approve")]
-    [Authorize(Roles = "Manager")]
-    public async Task<IActionResult> Approve(int id)
-    {
-        var managerEmployeeId = await GetCurrentEmployeeIdAsync();
-        var result = await _service.ApproveLeaveAsync(id, managerEmployeeId);
+        var UpdatedBy = GetCurrentUserId();
+        var result = await _service.ApproveLeaveAsync(managerEmployeeId,id, dto,UpdatedBy);
 
         return Ok(new ApiResponse<LeaveRequestResponseDto>
         {
@@ -93,19 +82,22 @@ public class LeaveRequestController : BaseController
         });
     }
 
-    [HttpPut("{id}/reject")]
+    [HttpGet]
     [Authorize(Roles = "Manager")]
-    public async Task<IActionResult> Reject(int id, [FromBody] RejectLeaveDto dto)
+    public async Task<IActionResult> GetAll([FromQuery] LeaveFilterRequestDto request)
     {
         var managerEmployeeId = await GetCurrentEmployeeIdAsync();
-        var result = await _service.RejectLeaveAsync(id, managerEmployeeId, dto);
 
-        return Ok(new ApiResponse<LeaveRequestResponseDto>
+        var result = await _service.GetAllAsync(request, managerEmployeeId);
+        return Ok(new ApiResponse<PagedResult<LeaveRequestResponseDto>>
         {
             Success = true,
-            Message = "Leave request rejected successfully.",
+            Message = "Leave requests retrieved successfully.",
             Data = result,
             StatusCode = 200
         });
     }
+
+
+
 }
